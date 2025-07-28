@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useBalance } from 'wagmi';
 
 interface TerminalLine {
   id: number;
@@ -9,6 +11,9 @@ interface TerminalLine {
 }
 
 export default function Terminal() {
+  const { address, isConnected } = useAccount();
+  const { data: balance } = useBalance({ address });
+  
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0' },
     { id: 1, type: 'output', content: 'Type "help" for available commands.' }
@@ -32,14 +37,31 @@ export default function Terminal() {
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     const commands: Record<string, () => void | Promise<void>> = {
-      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait'].forEach(addLine),
-      // clear: () => setLines([]),
-      // echo: () => addLine(args.join(' ')),
-      // date: () => addLine(new Date().toString()),
-      // whoami: () => addLine('defi-user'),
-      // pwd: () => addLine('/home/defi-user/terminal'),
-      // ls: () => ['contracts/', 'scripts/', 'config.json', 'README.md'].forEach(addLine),
-      // history: () => commandHistory.forEach((cmd, i) => addLine(`${i + 1}  ${cmd}`)),
+      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance'].forEach(cmd => addLine(cmd)),
+      clear: () => setLines([]),
+      echo: () => addLine(args.join(' ')),
+      date: () => addLine(new Date().toString()),
+      whoami: () => addLine(isConnected ? address?.slice(0, 6) + '...' + address?.slice(-4) : 'defi-user'),
+      pwd: () => addLine('/home/defi-user/terminal'),
+      ls: () => ['contracts/', 'scripts/', 'config.json', 'README.md'].forEach(cmd => addLine(cmd)),
+      history: () => commandHistory.forEach((cmd, i) => addLine(`${i + 1}  ${cmd}`)),
+      wallet: () => {
+        if (!isConnected) {
+          addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
+        } else {
+          addLine(`Connected to: ${address}`);
+          addLine(`Network: ${balance?.symbol || 'Unknown'}`);
+        }
+      },
+      balance: () => {
+        if (!isConnected) {
+          addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
+        } else if (balance) {
+          addLine(`${balance.formatted} ${balance.symbol}`);
+        } else {
+          addLine('Balance not available');
+        }
+      },
       curl: async () => {
         if (!args[0]) return addLine('Usage: curl <url>', 'error');
         try {
@@ -106,7 +128,7 @@ export default function Terminal() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep'];
+      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance'];
       const matches = commands.filter(cmd => cmd.startsWith(currentCommand.toLowerCase()));
       if (matches.length === 1) setCurrentCommand(matches[0] + ' ');
     } else if (e.key === 'l' && e.ctrlKey) {
@@ -118,11 +140,18 @@ export default function Terminal() {
   return (
     <div className="w-full h-screen bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
       <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
-        <span className="text-gray-300 text-xs">defi-user@terminal</span>
-        <div className="flex space-x-1">
-          <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
-          <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
-          <div className="w-3 h-3 bg-red-600 border border-red-500 hover:bg-red-500 cursor-pointer"></div>
+        <span className="text-gray-300 text-xs">
+          {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}@terminal` : 'defi-user@terminal'}
+        </span>
+        <div className="flex items-center space-x-3">
+          <div className="scale-75">
+            <ConnectButton />
+          </div>
+          <div className="flex space-x-1">
+            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
+            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
+            <div className="w-3 h-3 bg-red-600 border border-red-500 hover:bg-red-500 cursor-pointer"></div>
+          </div>
         </div>
       </div>
       
