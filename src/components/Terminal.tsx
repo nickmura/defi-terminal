@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance, useSignMessage, useChainId, useSendTransaction, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useBalance, useSignMessage, useChainId, useSendTransaction, useWriteContract, useReadContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
 import { TOKENS } from '../app/helper';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
@@ -29,6 +29,7 @@ export default function Terminal() {
   const chainId = useChainId();
   const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
+  const { switchChainAsync } = useSwitchChain();
   
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0' },
@@ -40,6 +41,7 @@ export default function Terminal() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingSwap, setPendingSwap] = useState<SwapQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +51,8 @@ export default function Terminal() {
   }, [lines]);
 
   const addLine = (content: string, type: 'command' | 'output' | 'error' = 'output') => {
-    setLines(prev => [...prev, { id: Date.now(), type, content }]);
+    const id = lineIdCounterRef.current++;
+    setLines(prev => [...prev, { id, type, content }]);
   };
 
   const getTokenAddress = (symbol: string, networkId: number): string | null => {
@@ -90,11 +93,44 @@ export default function Terminal() {
     return { type, amount, fromToken, toToken, network, slippage };
   };
 
+  const switchNetworkIfNeeded = async (targetNetwork: string): Promise<boolean> => {
+    const targetChainId = parseInt(targetNetwork);
+    
+    if (chainId === targetChainId) {
+      return true; // Already on correct network
+    }
+
+    try {
+      const networkName = targetChainId === 10 ? 'Optimism' : targetChainId === 42161 ? 'Arbitrum' : `Chain ${targetChainId}`;
+      addLine(`🔄 Switching to ${networkName}...`);
+      addLine('Please confirm network switch in your wallet...');
+      
+      await switchChainAsync({ chainId: targetChainId });
+      
+      addLine(`✅ Successfully switched to ${networkName}`);
+      return true;
+      
+    } catch (error: any) {
+      if (error?.message?.includes('User rejected')) {
+        addLine('❌ Network switch cancelled by user', 'error');
+      } else {
+        addLine(`❌ Failed to switch network: ${error?.message || 'Unknown error'}`, 'error');
+      }
+      return false;
+    }
+  };
+
   const executeSwap = async (swapQuote: SwapQuote) => {
     if (!address) return;
 
     try {
       addLine('🔄 Starting swap execution...');
+      
+      // Ensure we're on the correct network before executing
+      const networkSwitched = await switchNetworkIfNeeded(swapQuote.network);
+      if (!networkSwitched) {
+        return; // Network switch failed or was cancelled
+      }
       
       const srcAddress = getTokenAddress(swapQuote.fromToken, parseInt(swapQuote.network));
       const dstAddress = getTokenAddress(swapQuote.toToken, parseInt(swapQuote.network));
@@ -275,6 +311,12 @@ export default function Terminal() {
         addLine(`🔍 Getting quote for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
         addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
         addLine(`📊 Slippage: ${slippage}%`);
+
+        // Check if network switch is needed
+        const networkSwitched = await switchNetworkIfNeeded(network);
+        if (!networkSwitched) {
+          return; // Network switch failed or was cancelled
+        }
 
         try {
           const srcAddress = getTokenAddress(fromToken, parseInt(network));
