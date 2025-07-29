@@ -32,9 +32,11 @@ export async function GET(request: NextRequest) {
     url.searchParams.append('src', src);
     url.searchParams.append('dst', dst);
     url.searchParams.append('amount', amount);
+    url.searchParams.append('includeGas', 'true');
     if (slippage) {
       url.searchParams.append('slippage', slippage);
     }
+
 
     console.log('Getting quote from:', url.toString());
     console.log('Request params:', { src, dst, amount, slippage });
@@ -49,7 +51,8 @@ export async function GET(request: NextRequest) {
     });
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', [...response.headers.entries()]);
+    // console.log('Response headers:', [...response.headers.entries()]);
+
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -62,6 +65,8 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    console.log(data)
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Quote proxy error:', error);

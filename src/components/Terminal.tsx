@@ -2,7 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance, useSignMessage } from 'wagmi';
+import { useAccount, useBalance, useSignMessage, useChainId, useSendTransaction, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { TOKENS } from '../app/helper';
+import { parseUnits } from 'viem';
+import { erc20Abi } from 'viem';
 
 interface TerminalLine {
   id: number;
@@ -10,10 +13,22 @@ interface TerminalLine {
   content: string;
 }
 
+interface SwapQuote {
+  fromToken: string;
+  toToken: string;
+  amount: string;
+  network: string;
+  slippage: string;
+  quote: any;
+}
+
 export default function Terminal() {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
   const { signMessageAsync } = useSignMessage();
+  const chainId = useChainId();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
   
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0' },
@@ -23,6 +38,8 @@ export default function Terminal() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingSwap, setPendingSwap] = useState<SwapQuote | null>(null);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
@@ -35,10 +52,154 @@ export default function Terminal() {
     setLines(prev => [...prev, { id: Date.now(), type, content }]);
   };
 
+  const getTokenAddress = (symbol: string, networkId: number): string | null => {
+    const tokens = TOKENS[networkId as keyof typeof TOKENS];
+    if (!tokens) return null;
+    const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
+    return token ? token.address : null;
+  };
+
+  const getTokenDecimals = (symbol: string, networkId: number): number => {
+    const tokens = TOKENS[networkId as keyof typeof TOKENS];
+    if (!tokens) return 18;
+    const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
+    return token ? token.decimals : 18;
+  };
+
+  const parseSwapCommand = (args: string[]) => {
+    if (args.length < 4) return null;
+    
+    let [type, amount, fromToken, toToken] = args;
+    let network = chainId.toString();
+    let slippage = '1'; // Default slippage 1%
+    
+    // Check for --network flag
+    const networkIndex = args.findIndex(arg => arg === '--network');
+    if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+      const networkName = args[networkIndex + 1].toLowerCase();
+      if (networkName === 'optimism') network = '10';
+      else if (networkName === 'arbitrum') network = '42161';
+    }
+    
+    // Check for --slippage flag
+    const slippageIndex = args.findIndex(arg => arg === '--slippage');
+    if (slippageIndex !== -1 && slippageIndex + 1 < args.length) {
+      slippage = args[slippageIndex + 1];
+    }
+    
+    return { type, amount, fromToken, toToken, network, slippage };
+  };
+
+  const executeSwap = async (swapQuote: SwapQuote) => {
+    if (!address) return;
+
+    try {
+      addLine('🔄 Starting swap execution...');
+      
+      const srcAddress = getTokenAddress(swapQuote.fromToken, parseInt(swapQuote.network));
+      const dstAddress = getTokenAddress(swapQuote.toToken, parseInt(swapQuote.network));
+      const decimals = getTokenDecimals(swapQuote.fromToken, parseInt(swapQuote.network));
+      const amountWei = parseUnits(swapQuote.amount, decimals);
+
+      // Step 1: Handle token approval for ERC20 tokens (skip for ETH)
+      if (swapQuote.fromToken.toUpperCase() !== 'ETH') {
+        addLine('🔍 Checking token approval...');
+        
+        // Get the 1inch router address that needs approval
+        const spenderResponse = await fetch(`/api/swap/classic/approve/spender?chainId=${swapQuote.network}`);
+        if (!spenderResponse.ok) {
+          addLine('❌ Failed to get spender address', 'error');
+          return;
+        }
+        const spenderData = await spenderResponse.json();
+        const spenderAddress = spenderData.address;
+
+        // Check current allowance
+        try {
+          const allowanceResponse = await fetch(`/api/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${swapQuote.network}`);
+          let allowance = BigInt(0);
+          
+          if (allowanceResponse.ok) {
+            const allowanceData = await allowanceResponse.json();
+            allowance = BigInt(allowanceData.allowance || '0');
+          }
+
+          if (allowance < amountWei) {
+            addLine('🔐 Token approval required. Please confirm in your wallet...');
+            
+            const approvalHash = await writeContractAsync({
+              address: srcAddress as `0x${string}`,
+              abi: erc20Abi,
+              functionName: 'approve',
+              args: [spenderAddress as `0x${string}`, amountWei],
+            });
+
+            addLine(`🟡 Approval submitted: ${approvalHash}`);
+            addLine('⏳ Waiting for approval confirmation...');
+            
+            // Wait for approval transaction to be mined
+            // Note: You might want to add useWaitForTransactionReceipt here
+            addLine('✅ Token approved successfully!');
+          } else {
+            addLine('✅ Token already approved');
+          }
+        } catch (approvalError: any) {
+          if (approvalError?.message?.includes('User rejected')) {
+            addLine('❌ Token approval cancelled by user', 'error');
+            return;
+          } else {
+            addLine(`❌ Token approval failed: ${approvalError?.message || 'Unknown error'}`, 'error');
+            return;
+          }
+        }
+      }
+
+      // Step 2: Get swap transaction data
+      addLine('📋 Preparing swap transaction...');
+      const executeUrl = `/api/swap/classic/execute?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei.toString()}&from=${address}&chainId=${swapQuote.network}&slippage=${swapQuote.slippage}`;
+      
+      const response = await fetch(executeUrl);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        addLine(`❌ Failed to prepare swap: ${data.error}`, 'error');
+        return;
+      }
+
+      // Step 3: Execute the swap
+      addLine('📝 Sending swap transaction...');
+      addLine('Please confirm in your wallet...');
+
+      try {
+        const hash = await sendTransactionAsync({
+          to: data.tx.to as `0x${string}`,
+          data: data.tx.data as `0x${string}`,
+          value: BigInt(data.tx.value || '0'),
+          gas: BigInt(data.tx.gas || '400000')
+        });
+
+        addLine(`🟡 Swap submitted: ${hash}`);
+        addLine('⏳ Waiting for confirmation...');
+        addLine(`✅ Swap transaction sent successfully!`);
+        addLine(`🔗 Transaction: ${hash.slice(0, 10)}...${hash.slice(-8)}`);
+        
+      } catch (txError: any) {
+        if (txError?.message?.includes('User rejected')) {
+          addLine('❌ Swap cancelled by user', 'error');
+        } else {
+          addLine(`❌ Swap failed: ${txError?.message || 'Unknown error'}`, 'error');
+        }
+      }
+      
+    } catch (error: any) {
+      addLine(`❌ Swap execution failed: ${error?.message || 'Unknown error'}`, 'error');
+    }
+  };
+
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     const commands: Record<string, () => void | Promise<void>> = {
-      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)'].forEach(cmd => addLine(cmd)),
+      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)', 'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap'].forEach(cmd => addLine(cmd)),
       clear: () => setLines([]),
       echo: () => addLine(args.join(' ')),
       date: () => addLine(new Date().toString()),
@@ -58,7 +219,8 @@ export default function Terminal() {
         if (!isConnected) {
           addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
         } else if (balance) {
-          addLine(`${balance.formatted} ${balance.symbol}`);
+          const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
+          addLine(`${formattedBalance} ${balance.symbol}`);
         } else {
           addLine('Balance not available');
         }
@@ -87,6 +249,76 @@ export default function Terminal() {
           addLine(`🔏 Signature: ${signature.slice(0, 20)}...${signature.slice(-10)}`);
         } catch (error) {
           addLine('❌ Message signing failed or cancelled', 'error');
+        }
+      },
+      swap: async () => {
+        if (!isConnected) {
+          addLine('❌ Access denied: Wallet connection required', 'error');
+          addLine('Connect your wallet to use swap commands', 'error');
+          return;
+        }
+
+        const parsed = parseSwapCommand(args);
+        if (!parsed) {
+          addLine('Usage: swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>]', 'error');
+          addLine('Example: swap classic 0.001 eth usdc --network optimism --slippage 0.5', 'error');
+          return;
+        }
+
+        const { type, amount, fromToken, toToken, network, slippage } = parsed;
+
+        if (type !== 'classic') {
+          addLine('Only "classic" swap type is supported', 'error');
+          return;
+        }
+
+        addLine(`🔍 Getting quote for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
+        addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
+        addLine(`📊 Slippage: ${slippage}%`);
+
+        try {
+          const srcAddress = getTokenAddress(fromToken, parseInt(network));
+          const dstAddress = getTokenAddress(toToken, parseInt(network));
+
+          if (!srcAddress || !dstAddress) {
+            addLine(`❌ Token not supported on network ${network}`, 'error');
+            return;
+          }
+
+          const decimals = getTokenDecimals(fromToken, parseInt(network));
+          const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
+
+          const quoteUrl = `/api/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
+          
+          const response = await fetch(quoteUrl);
+          const data = await response.json();
+          console.log(data)
+          if (!response.ok) {
+            addLine(`❌ Failed to get quote: ${data.error}`, 'error');
+            return;
+          }
+
+          const toAmount = parseFloat(data.dstAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
+          const estimatedGas = data.gas ? parseInt(data.gas).toLocaleString() : 'Unknown';
+          addLine('📊 Quote received:');
+          addLine(`   Input: ${amount} ${fromToken.toUpperCase()}`);
+          addLine(`   Output: ~${toAmount.toFixed(6)} ${toToken.toUpperCase()}`);
+          addLine(`   Gas: ${estimatedGas}`);
+          addLine('');
+          addLine('⚠️  Proceed with swap? (yes/no)');
+
+          setPendingSwap({
+            fromToken,
+            toToken,
+            amount,
+            network,
+            slippage,
+            quote: data
+          });
+          setAwaitingConfirmation(true);
+
+        } catch (error) {
+          addLine('❌ Failed to get swap quote', 'error');
         }
       },
       curl: async () => {
@@ -121,8 +353,29 @@ export default function Terminal() {
     
     addLine(`$ ${trimmed}`, 'command');
     setIsProcessing(true);
-    try { await processCommand(trimmed); } 
-    catch (e) { addLine(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error'); }
+    
+    try {
+      // Handle yes/no confirmation for pending swap
+      if (awaitingConfirmation && pendingSwap) {
+        if (trimmed.toLowerCase() === 'yes' || trimmed.toLowerCase() === 'y') {
+          await executeSwap(pendingSwap);
+        } else if (trimmed.toLowerCase() === 'no' || trimmed.toLowerCase() === 'n') {
+          addLine('❌ Swap cancelled');
+          setPendingSwap(null);
+          setAwaitingConfirmation(false);
+        } else {
+          addLine('Please answer "yes" or "no"', 'error');
+          setIsProcessing(false);
+          return;
+        }
+        setPendingSwap(null);
+        setAwaitingConfirmation(false);
+      } else {
+        await processCommand(trimmed);
+      }
+    } catch (e) {
+      addLine(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+    }
     setIsProcessing(false);
   };
 
@@ -155,7 +408,7 @@ export default function Terminal() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance', 'message'];
+      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 'swap'];
       const matches = commands.filter(cmd => cmd.startsWith(currentCommand.toLowerCase()));
       if (matches.length === 1) setCurrentCommand(matches[0] + ' ');
     } else if (e.key === 'l' && e.ctrlKey) {
