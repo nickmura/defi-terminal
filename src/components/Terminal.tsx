@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance, useSignMessage } from 'wagmi';
 
 interface TerminalLine {
   id: number;
@@ -13,6 +13,7 @@ interface TerminalLine {
 export default function Terminal() {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
+  const { signMessageAsync } = useSignMessage();
   
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0' },
@@ -37,7 +38,7 @@ export default function Terminal() {
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     const commands: Record<string, () => void | Promise<void>> = {
-      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance'].forEach(cmd => addLine(cmd)),
+      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)'].forEach(cmd => addLine(cmd)),
       clear: () => setLines([]),
       echo: () => addLine(args.join(' ')),
       date: () => addLine(new Date().toString()),
@@ -60,6 +61,32 @@ export default function Terminal() {
           addLine(`${balance.formatted} ${balance.symbol}`);
         } else {
           addLine('Balance not available');
+        }
+      },
+      message: async () => {
+        if (!isConnected) {
+          addLine('❌ Access denied: Wallet connection required', 'error');
+          addLine('Connect your wallet to use this command', 'error');
+          return;
+        }
+        if (args.length === 0) {
+          addLine('Usage: message <text>', 'error');
+          return;
+        }
+        
+        addLine(`🔐 Wallet authenticated: ${address?.slice(0, 6)}...${address?.slice(-4)}`);
+        
+        try {
+          const messageText = args.join(' ');
+          addLine(`📝 Signing message: "${messageText}"`);
+          addLine('Please confirm in your wallet...');
+          
+          const signature = await signMessageAsync({ message: messageText });
+          
+          addLine('✅ Message signed successfully!');
+          addLine(`🔏 Signature: ${signature.slice(0, 20)}...${signature.slice(-10)}`);
+        } catch (error) {
+          addLine('❌ Message signing failed or cancelled', 'error');
         }
       },
       curl: async () => {
@@ -128,7 +155,7 @@ export default function Terminal() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance'];
+      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance', 'message'];
       const matches = commands.filter(cmd => cmd.startsWith(currentCommand.toLowerCase()));
       if (matches.length === 1) setCurrentCommand(matches[0] + ' ');
     } else if (e.key === 'l' && e.ctrlKey) {
