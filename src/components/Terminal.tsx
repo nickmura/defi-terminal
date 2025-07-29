@@ -11,6 +11,7 @@ interface TerminalLine {
   id: number;
   type: 'command' | 'output' | 'error';
   content: string;
+  timestamp: Date;
 }
 
 interface SwapQuote {
@@ -32,8 +33,8 @@ export default function Terminal() {
   const { switchChainAsync } = useSwitchChain();
   
   const [lines, setLines] = useState<TerminalLine[]>([
-    { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0' },
-    { id: 1, type: 'output', content: 'Type "help" for available commands.' }
+    { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0', timestamp: new Date() },
+    { id: 1, type: 'output', content: 'Type "help" for available commands.', timestamp: new Date() }
   ]);
   const [currentCommand, setCurrentCommand] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -52,7 +53,7 @@ export default function Terminal() {
 
   const addLine = (content: string, type: 'command' | 'output' | 'error' = 'output') => {
     const id = lineIdCounterRef.current++;
-    setLines(prev => [...prev, { id, type, content }]);
+    setLines(prev => [...prev, { id, type, content, timestamp: new Date() }]);
   };
 
   const getTokenAddress = (symbol: string, networkId: number): string | null => {
@@ -479,30 +480,58 @@ export default function Terminal() {
       
       <div ref={terminalRef} className="flex-1 p-4 overflow-y-auto cursor-text" onClick={() => inputRef.current?.focus()}>
         {lines.map((line) => (
-          <div key={line.id} className={`mb-1 ${
-            line.type === 'command' ? 'text-white' :
-            line.type === 'error' ? 'text-red-400' : 'text-green-400'
-          }`}>
-            {line.content}
+          <div key={line.id} className="flex items-start space-x-2 mb-1">
+            <span className="text-gray-500 text-xs min-w-[60px]">
+              {line.timestamp.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+              })}
+            </span>
+            <span className={`flex-1 ${
+              line.type === 'command' ? 'text-white' :
+              line.type === 'error' ? 'text-red-400' : 'text-gray-300'
+            }`}>
+              {line.content}
+            </span>
           </div>
         ))}
         
         {!isProcessing ? (
-          <div className="flex items-center mt-2">
-            <span className="text-white mr-2">$</span>
+          <div className="flex items-center space-x-2 mt-2">
+            <span className="text-gray-500 text-xs min-w-[60px]">
+              {new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+              })}
+            </span>
+            <span className="text-white">$</span>
             <input
               ref={inputRef}
               type="text"
               value={currentCommand}
               onChange={(e) => setCurrentCommand(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 bg-transparent text-green-400 outline-none caret-green-400"
+              className="flex-1 bg-transparent text-white outline-none caret-white"
               spellCheck={false}
               autoComplete="off"
             />
           </div>
         ) : (
-          <div className="text-yellow-400 animate-pulse mt-2">Processing...</div>
+          <div className="flex items-center space-x-2 mt-2">
+            <span className="text-gray-500 text-xs min-w-[60px]">
+              {new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+              })}
+            </span>
+            <span className="text-yellow-400 animate-pulse">Processing...</span>
+          </div>
         )}
       </div>
       
