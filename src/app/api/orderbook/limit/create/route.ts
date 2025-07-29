@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
 
     const typedData = limitOrder.getTypedData(fromChainId)
-  
+
     return NextResponse.json({
       fromChainId,
       build,

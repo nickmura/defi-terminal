@@ -23,6 +23,15 @@ interface SwapQuote {
   quote: any;
 }
 
+interface LimitOrderQuote {
+  fromToken: string;
+  toToken: string;
+  amount: string;
+  network: string;
+  rate?: string;
+  quote: any;
+}
+
 export default function Terminal() {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
@@ -41,7 +50,9 @@ export default function Terminal() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingSwap, setPendingSwap] = useState<SwapQuote | null>(null);
+  const [pendingLimitOrder, setPendingLimitOrder] = useState<LimitOrderQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [awaitingRateConfirmation, setAwaitingRateConfirmation] = useState(false);
   const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -118,6 +129,30 @@ export default function Terminal() {
     return { type, amount, fromToken, toToken, network, slippage };
   };
 
+  const parseLimitOrderCommand = (args: string[]) => {
+    if (args.length < 4) return null;
+    
+    let [type, amount, fromToken, toToken] = args;
+    let network = chainId.toString();
+    let rate: string | undefined;
+    
+    // Check for --network flag
+    const networkIndex = args.findIndex(arg => arg === '--network');
+    if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+      const networkName = args[networkIndex + 1].toLowerCase();
+      if (networkName === 'optimism') network = '10';
+      else if (networkName === 'arbitrum') network = '42161';
+    }
+    
+    // Check for --rate flag
+    const rateIndex = args.findIndex(arg => arg === '--rate');
+    if (rateIndex !== -1 && rateIndex + 1 < args.length) {
+      rate = args[rateIndex + 1];
+    }
+    
+    return { type, amount, fromToken, toToken, network, rate };
+  };
+
   const switchNetworkIfNeeded = async (targetNetwork: string): Promise<boolean> => {
     const targetChainId = parseInt(targetNetwork);
     
@@ -142,6 +177,100 @@ export default function Terminal() {
         addLine(`❌ Failed to switch network: ${error?.message || 'Unknown error'}`, 'error');
       }
       return false;
+    }
+  };
+
+  const handleLimitOrder = async (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => {
+    addLine(`🔍 Getting market data for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
+    addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
+
+    // Check if network switch is needed
+    const networkSwitched = await switchNetworkIfNeeded(network);
+    if (!networkSwitched) {
+      return;
+    }
+
+    try {
+      const srcAddress = getTokenAddress(fromToken, parseInt(network));
+      const dstAddress = getTokenAddress(toToken, parseInt(network));
+
+      if (!srcAddress || !dstAddress) {
+        addLine(`❌ Token not supported on network ${network}`, 'error');
+        return;
+      }
+
+      const decimals = getTokenDecimals(fromToken, parseInt(network));
+      const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
+
+      // Get prices for both tokens using the new price API
+      const fromPriceResponse = await fetch('/api/prices/price_by_token?chainId=' + network, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: fromToken })
+      });
+      const toPriceResponse = await fetch('/api/prices/price_by_token?chainId=' + network, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: toToken })
+      });
+
+      if (!fromPriceResponse.ok || !toPriceResponse.ok) {
+        addLine(`❌ Failed to get token prices`, 'error');
+        return;
+      }
+
+      const fromPriceData = await fromPriceResponse.json();
+      const toPriceData = await toPriceResponse.json();
+
+      if (!fromPriceData.price || !toPriceData.price) {
+        addLine(`❌ Price data not available for token pair`, 'error');
+        return;
+      }
+
+      // Calculate current market rate: how much toToken per fromToken
+      const currentRate = parseFloat(fromPriceData.price) / parseFloat(toPriceData.price);
+      
+      addLine('📊 Market data:');
+      addLine(`   ${fromToken.toUpperCase()} price: $${parseFloat(fromPriceData.price).toFixed(4)}`);
+      addLine(`   ${toToken.toUpperCase()} price: $${parseFloat(toPriceData.price).toFixed(4)}`);
+      addLine(`   Current rate: ${currentRate.toFixed(6)} ${toToken.toUpperCase()} per ${fromToken.toUpperCase()}`);
+      addLine('');
+
+      if (rate) {
+        // Rate provided via --rate flag
+        const specifiedRate = parseFloat(rate);
+        const priceComparison = specifiedRate > currentRate ? 'above' : 'below';
+        const percentDiff = Math.abs(((specifiedRate - currentRate) / currentRate) * 100).toFixed(2);
+        
+        addLine(`✅ Using specified rate: ${rate} ${toToken.toUpperCase()} per ${fromToken.toUpperCase()}`);
+        addLine(`   This is ${percentDiff}% ${priceComparison} current market rate`);
+        addLine('⚠️  Create limit order? (yes/no)');
+        
+        setPendingLimitOrder({
+          fromToken,
+          toToken,
+          amount,
+          network,
+          rate,
+          quote: { marketRate: currentRate, suggestedRate: rate }
+        });
+        setAwaitingConfirmation(true);
+      } else {
+        // No rate provided, ask for confirmation with market rate
+        addLine(`⚠️  Use current market rate (${currentRate.toFixed(6)}) for limit order? (yes/no)`);
+        setPendingLimitOrder({
+          fromToken,
+          toToken,
+          amount,
+          network,
+          rate: currentRate.toFixed(6),
+          quote: { marketRate: currentRate, suggestedRate: currentRate.toFixed(6) }
+        });
+        setAwaitingConfirmation(true);
+      }
+
+    } catch (error) {
+      addLine('❌ Failed to get limit order quote', 'error');
     }
   };
 
@@ -257,10 +386,136 @@ export default function Terminal() {
     }
   };
 
+  const executeLimitOrder = async (limitOrder: LimitOrderQuote) => {
+    if (!address || !limitOrder.rate) return;
+
+    try {
+      addLine('🔄 Creating limit order...');
+      
+      // Ensure we're on the correct network
+      const networkSwitched = await switchNetworkIfNeeded(limitOrder.network);
+      if (!networkSwitched) {
+        return;
+      }
+      
+      const srcAddress = getTokenAddress(limitOrder.fromToken, parseInt(limitOrder.network));
+      const dstAddress = getTokenAddress(limitOrder.toToken, parseInt(limitOrder.network));
+
+      if (!srcAddress || !dstAddress) {
+        addLine(`❌ Token not supported on network ${limitOrder.network}`, 'error');
+        return;
+      }
+
+      // Prepare token objects with decimals for the create endpoint
+      const fromTokenInfo = {
+        address: srcAddress,
+        decimals: getTokenDecimals(limitOrder.fromToken, parseInt(limitOrder.network))
+      };
+      const toTokenInfo = {
+        address: dstAddress,
+        decimals: getTokenDecimals(limitOrder.toToken, parseInt(limitOrder.network))
+      };
+
+      const createData = {
+        fromChainId: parseInt(limitOrder.network),
+        fromToken: fromTokenInfo,
+        toToken: toTokenInfo,
+        amount: limitOrder.amount,
+        price: limitOrder.rate,
+        userAddress: address
+      };
+
+      addLine(`📋 Creating limit order:`);
+      addLine(`   Sell: ${limitOrder.amount} ${limitOrder.fromToken.toUpperCase()}`);
+      addLine(`   Buy: ${limitOrder.toToken.toUpperCase()}`);
+      addLine(`   Rate: ${limitOrder.rate} ${limitOrder.toToken.toUpperCase()} per ${limitOrder.fromToken.toUpperCase()}`);
+      addLine(`   Network: ${limitOrder.network === '10' ? 'Optimism' : 'Arbitrum'}`);
+
+      const response = await fetch('/api/orderbook/limit/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        addLine(`❌ Failed to create limit order: ${errorData.error}`, 'error');
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Limit order creation data', data)
+      addLine('✅ Limit order created successfully!');
+      addLine(`📄 Order data prepared for signing`);
+      addLine('💡 Next: Sign the order to activate it');
+      
+    } catch (error: any) {
+      addLine(`❌ Limit order failed: ${error?.message || 'Unknown error'}`, 'error');
+    }
+  };
+
+  const handleClassicSwap = async (amount: string, fromToken: string, toToken: string, network: string, slippage: string) => {
+    addLine(`🔍 Getting quote for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
+    addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
+    addLine(`📊 Slippage: ${slippage}%`);
+
+    // Check if network switch is needed
+    const networkSwitched = await switchNetworkIfNeeded(network);
+    if (!networkSwitched) {
+      return; // Network switch failed or was cancelled
+    }
+
+    try {
+      const srcAddress = getTokenAddress(fromToken, parseInt(network));
+      const dstAddress = getTokenAddress(toToken, parseInt(network));
+
+      if (!srcAddress || !dstAddress) {
+        addLine(`❌ Token not supported on network ${network}`, 'error');
+        return;
+      }
+
+      const decimals = getTokenDecimals(fromToken, parseInt(network));
+      const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
+
+      const quoteUrl = `/api/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
+      
+      const response = await fetch(quoteUrl);
+      const data = await response.json();
+
+      if (!response.ok) {
+        addLine(`❌ Failed to get quote: ${data.error}`, 'error');
+        return;
+      }
+
+      const toAmount = parseFloat(data.toAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
+      const estimatedGas = data.estimatedGas ? parseInt(data.estimatedGas).toLocaleString() : 'Unknown';
+
+      addLine('📊 Quote received:');
+      addLine(`   Input: ${amount} ${fromToken.toUpperCase()}`);
+      addLine(`   Output: ~${toAmount.toFixed(6)} ${toToken.toUpperCase()}`);
+      addLine(`   Gas: ${estimatedGas}`);
+      addLine('');
+      addLine('⚠️  Proceed with swap? (yes/no)');
+
+      setPendingSwap({
+        fromToken,
+        toToken,
+        amount,
+        network,
+        slippage,
+        quote: data
+      });
+      setAwaitingConfirmation(true);
+
+    } catch (error) {
+      addLine('❌ Failed to get swap quote', 'error');
+    }
+  };
+
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     const commands: Record<string, () => void | Promise<void>> = {
-      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'history clear - Clear command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)', 'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap'].forEach(cmd => addLine(cmd)),
+      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'history clear - Clear command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)', 'price <symbol|address> [--network <name>] - Get token price', 'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'].forEach(cmd => addLine(cmd)),
       clear: () => setLines([]),
       echo: () => addLine(args.join(' ')),
       date: () => addLine(new Date().toString()),
@@ -331,73 +586,35 @@ export default function Terminal() {
           return;
         }
 
-        const parsed = parseSwapCommand(args);
-        if (!parsed) {
-          addLine('Usage: swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>]', 'error');
-          addLine('Example: swap classic 0.001 eth usdc --network optimism --slippage 0.5', 'error');
-          return;
-        }
-
-        const { type, amount, fromToken, toToken, network, slippage } = parsed;
-
-        if (type !== 'classic') {
-          addLine('Only "classic" swap type is supported', 'error');
-          return;
-        }
-
-        addLine(`🔍 Getting quote for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
-        addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
-        addLine(`📊 Slippage: ${slippage}%`);
-
-        // Check if network switch is needed
-        const networkSwitched = await switchNetworkIfNeeded(network);
-        if (!networkSwitched) {
-          return; // Network switch failed or was cancelled
-        }
-
-        try {
-          const srcAddress = getTokenAddress(fromToken, parseInt(network));
-          const dstAddress = getTokenAddress(toToken, parseInt(network));
-
-          if (!srcAddress || !dstAddress) {
-            addLine(`❌ Token not supported on network ${network}`, 'error');
+        if (args[0] === 'classic') {
+          const parsed = parseSwapCommand(args);
+          if (!parsed) {
+            addLine('Usage: swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>]', 'error');
+            addLine('Example: swap classic 0.001 eth usdc --network optimism --slippage 0.5', 'error');
             return;
           }
 
-          const decimals = getTokenDecimals(fromToken, parseInt(network));
-          const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
-
-          const quoteUrl = `/api/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
+          const { amount, fromToken, toToken, network, slippage } = parsed;
           
-          const response = await fetch(quoteUrl);
-          const data = await response.json();
-          console.log(data)
-          if (!response.ok) {
-            addLine(`❌ Failed to get quote: ${data.error}`, 'error');
+          await handleClassicSwap(amount, fromToken, toToken, network, slippage);
+          
+        } else if (args[0] === 'limit') {
+          const parsed = parseLimitOrderCommand(args);
+          if (!parsed) {
+            addLine('Usage: swap limit <amount> <from> <to> [--rate <rate>] [--network <name>]', 'error');
+            addLine('Example: swap limit 1 eth usdc --rate 4000 --network optimism', 'error');
             return;
           }
 
-          const toAmount = parseFloat(data.dstAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
-          const estimatedGas = data.gas ? parseInt(data.gas).toLocaleString() : 'Unknown';
-          addLine('📊 Quote received:');
-          addLine(`   Input: ${amount} ${fromToken.toUpperCase()}`);
-          addLine(`   Output: ~${toAmount.toFixed(6)} ${toToken.toUpperCase()}`);
-          addLine(`   Gas: ${estimatedGas}`);
-          addLine('');
-          addLine('⚠️  Proceed with swap? (yes/no)');
-
-          setPendingSwap({
-            fromToken,
-            toToken,
-            amount,
-            network,
-            slippage,
-            quote: data
-          });
-          setAwaitingConfirmation(true);
-
-        } catch (error) {
-          addLine('❌ Failed to get swap quote', 'error');
+          const { amount, fromToken, toToken, network, rate } = parsed;
+          
+          await handleLimitOrder(amount, fromToken, toToken, network, rate);
+          
+        } else {
+          addLine('Usage: swap <classic|limit> <amount> <from> <to> [options]', 'error');
+          addLine('  swap classic - Immediate swap with slippage protection', 'error');
+          addLine('  swap limit - Create limit order at specific rate', 'error');
+          return;
         }
       },
       curl: async () => {
@@ -409,6 +626,50 @@ export default function Terminal() {
           const text = await res.text();
           addLine(text.slice(0, 500) + (text.length > 500 ? '...' : ''));
         } catch { addLine(`Failed to fetch ${args[0]}`, 'error'); }
+      },
+      price: async () => {
+        if (!args[0]) {
+          addLine('Usage: price <symbol|address> [--network <name>]', 'error');
+          addLine('Example: price eth --network arbitrum', 'error');
+          return;
+        }
+
+        const token = args[0];
+        let network = chainId.toString();
+        
+        // Check for --network flag
+        const networkIndex = args.findIndex(arg => arg === '--network');
+        if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+          const networkName = args[networkIndex + 1].toLowerCase();
+          if (networkName === 'optimism') network = '10';
+          else if (networkName === 'arbitrum') network = '42161';
+        }
+
+        try {
+          addLine(`🔍 Getting price for ${token.toUpperCase()}...`);
+          
+          const response = await fetch(`/api/prices/price_by_token?chainId=${network}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            addLine(`❌ Failed to get price: ${errorData.error}`, 'error');
+            return;
+          }
+
+          const data = await response.json();
+          const networkName = network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : `Chain ${network}`;
+          
+          addLine(`💰 ${token.toUpperCase()} Price:`);
+          addLine(`   Price: $${parseFloat(data.price).toFixed(4)} USD`);
+          addLine(`   Network: ${networkName}`);
+          addLine(`   Address: ${data.token}`);
+        } catch (error) {
+          addLine(`❌ Error getting price: ${error}`, 'error');
+        }
       },
       sleep: async () => {
         const ms = parseInt(args[0]) || 1000;
@@ -445,11 +706,43 @@ export default function Terminal() {
         } else {
           addLine('Please answer "yes" or "no"', 'error');
           setIsProcessing(false);
-          // Refocus input after error
           setTimeout(() => inputRef.current?.focus(), 10);
           return;
         }
         setPendingSwap(null);
+        setAwaitingConfirmation(false);
+      }
+      // Handle rate confirmation for pending limit order
+      else if (awaitingRateConfirmation && pendingLimitOrder) {
+        const rateInput = parseFloat(trimmed);
+        if (!isNaN(rateInput) && rateInput > 0) {
+          pendingLimitOrder.rate = trimmed;
+          addLine(`✅ Rate set to ${trimmed} ${pendingLimitOrder.toToken.toUpperCase()} per ${pendingLimitOrder.fromToken.toUpperCase()}`);
+          addLine('⚠️  Create limit order? (yes/no)');
+          setAwaitingRateConfirmation(false);
+          setAwaitingConfirmation(true);
+        } else {
+          addLine('Please enter a valid rate (number)', 'error');
+          setIsProcessing(false);
+          setTimeout(() => inputRef.current?.focus(), 10);
+          return;
+        }
+      }
+      // Handle yes/no confirmation for pending limit order
+      else if (awaitingConfirmation && pendingLimitOrder) {
+        if (trimmed.toLowerCase() === 'yes' || trimmed.toLowerCase() === 'y') {
+          await executeLimitOrder(pendingLimitOrder);
+        } else if (trimmed.toLowerCase() === 'no' || trimmed.toLowerCase() === 'n') {
+          addLine('❌ Limit order cancelled');
+          setPendingLimitOrder(null);
+          setAwaitingConfirmation(false);
+        } else {
+          addLine('Please answer "yes" or "no"', 'error');
+          setIsProcessing(false);
+          setTimeout(() => inputRef.current?.focus(), 10);
+          return;
+        }
+        setPendingLimitOrder(null);
         setAwaitingConfirmation(false);
       } else {
         await processCommand(trimmed);
@@ -492,7 +785,7 @@ export default function Terminal() {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 'swap'];
+      const commands = ['help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 'price', 'swap'];
       const matches = commands.filter(cmd => cmd.startsWith(currentCommand.toLowerCase()));
       if (matches.length === 1) setCurrentCommand(matches[0] + ' ');
     } else if (e.key === 'l' && e.ctrlKey) {
