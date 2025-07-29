@@ -51,6 +51,30 @@ export default function Terminal() {
     inputRef.current?.focus();
   }, [lines]);
 
+  // Load command history from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedHistory = localStorage.getItem('defi-terminal-history');
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        if (Array.isArray(parsedHistory)) {
+          setCommandHistory(parsedHistory);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load command history from localStorage:', error);
+    }
+  }, []);
+
+  // Save command history to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('defi-terminal-history', JSON.stringify(commandHistory));
+    } catch (error) {
+      console.warn('Failed to save command history to localStorage:', error);
+    }
+  }, [commandHistory]);
+
   const addLine = (content: string, type: 'command' | 'output' | 'error' = 'output') => {
     const id = lineIdCounterRef.current++;
     setLines(prev => [...prev, { id, type, content, timestamp: new Date() }]);
@@ -236,14 +260,26 @@ export default function Terminal() {
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     const commands: Record<string, () => void | Promise<void>> = {
-      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)', 'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap'].forEach(cmd => addLine(cmd)),
+      help: () => ['help - Show commands', 'clear - Clear terminal', 'echo <text> - Echo text', 'date - Show date', 'whoami - Show user', 'pwd - Show directory', 'ls - List files', 'history - Command history', 'history clear - Clear command history', 'curl <url> - HTTP request', 'sleep <ms> - Wait', 'wallet - Show wallet info', 'balance - Show wallet balance', 'message <text> - Sign message (requires wallet)', 'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap'].forEach(cmd => addLine(cmd)),
       clear: () => setLines([]),
       echo: () => addLine(args.join(' ')),
       date: () => addLine(new Date().toString()),
       whoami: () => addLine(isConnected ? address?.slice(0, 6) + '...' + address?.slice(-4) : 'defi-user'),
       pwd: () => addLine('/home/defi-user/terminal'),
       ls: () => ['contracts/', 'scripts/', 'config.json', 'README.md'].forEach(cmd => addLine(cmd)),
-      history: () => commandHistory.forEach((cmd, i) => addLine(`${i + 1}  ${cmd}`)),
+      history: () => {
+        if (args[0] === 'clear') {
+          setCommandHistory([]);
+          addLine('Command history cleared');
+        } else {
+          if (commandHistory.length === 0) {
+            addLine('No command history available');
+          } else {
+            addLine(`Command history (${commandHistory.length} entries):`);
+            commandHistory.forEach((cmd, i) => addLine(`${i + 1}  ${cmd}`));
+          }
+        }
+      },
       wallet: () => {
         if (!isConnected) {
           addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
@@ -409,6 +445,8 @@ export default function Terminal() {
         } else {
           addLine('Please answer "yes" or "no"', 'error');
           setIsProcessing(false);
+          // Refocus input after error
+          setTimeout(() => inputRef.current?.focus(), 10);
           return;
         }
         setPendingSwap(null);
@@ -420,6 +458,9 @@ export default function Terminal() {
       addLine(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
     }
     setIsProcessing(false);
+    
+    // Automatically refocus the input after command execution
+    setTimeout(() => inputRef.current?.focus(), 10);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
