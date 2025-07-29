@@ -511,10 +511,10 @@ export default function Terminal() {
           <div className="scale-75">
             <ConnectButton />
           </div>
-          <div className="flex space-x-1">
-            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
-            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer"></div>
-            <div className="w-3 h-3 bg-red-600 border border-red-500 hover:bg-red-500 cursor-pointer"></div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer rounded-full"></div>
+            <div className="w-3 h-3 bg-gray-600 border border-gray-500 hover:bg-gray-500 cursor-pointer rounded-full"></div>
+            <div className="w-3 h-3 bg-red-600 border border-gray-500 hover:bg-red-500 cursor-pointer rounded-full"></div>
           </div>
         </div>
       </div>
