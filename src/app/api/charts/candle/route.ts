@@ -12,13 +12,13 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
+    
     const searchParams = request.nextUrl.searchParams;
     const token0 = searchParams.get('token0');
     const token1 = searchParams.get('token1');
     const seconds = searchParams.get('seconds') || '300'; // Default to 5 minutes
     const chainId = searchParams.get('chainId') || '1'; // Default to Ethereum
-    
+    console.log(token0, token1)
     if (!token0 || !token1) {
       return NextResponse.json(
         { error: 'Missing required parameters: token0 and token1' },

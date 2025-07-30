@@ -17,6 +17,7 @@ export interface CommandContext {
   handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => Promise<void>;
   parseSwapCommand: (args: string[]) => any;
   parseLimitOrderCommand: (args: string[]) => any;
+  openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line') => void;
 }
 
 export const createCommands = (ctx: CommandContext) => {
@@ -35,7 +36,8 @@ export const createCommands = (ctx: CommandContext) => {
     handleClassicSwap,
     handleLimitOrder,
     parseSwapCommand,
-    parseLimitOrderCommand
+    parseLimitOrderCommand,
+    openChartModal
   } = ctx;
 
   return {
@@ -55,6 +57,7 @@ export const createCommands = (ctx: CommandContext) => {
       'balance - Show wallet balance', 
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
+      'chart <token0> [token1] [--type candle|line] [--network <name>] - Show price chart (defaults to /USDC)',
       'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 
       'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'
     ].forEach(cmd => addLine(cmd)),
@@ -227,6 +230,84 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
+    chart: async (args: string[]) => {
+      if (args.length < 1) {
+        addLine('Usage: chart <token0> [token1] [--type candle|line] [--network <name>]', 'error');
+        addLine('Example: chart eth          # ETH/USDC chart (USDC default)', 'error');
+        addLine('Example: chart eth usdt     # ETH/USDT chart', 'error');
+        addLine('Example: chart arb --network arbitrum  # ARB/USDC on Arbitrum', 'error');
+        return;
+      }
+
+      const token0Symbol = args[0];
+      const token1Symbol = args[1] || 'usdc'; // Default to USDC
+      let network = chainId.toString();
+      let chartType: 'candle' | 'line' = 'candle';
+
+      // Check for --network flag
+      const networkIndex = args.findIndex(arg => arg === '--network');
+      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+        const networkName = args[networkIndex + 1].toLowerCase();
+        if (networkName === 'optimism') network = '10';
+        else if (networkName === 'arbitrum') network = '42161';
+        else if (networkName === 'ethereum') network = '1';
+      }
+
+      // Check for --type flag
+      const typeIndex = args.findIndex(arg => arg === '--type');
+      if (typeIndex !== -1 && typeIndex + 1 < args.length) {
+        const type = args[typeIndex + 1].toLowerCase();
+        if (type === 'line' || type === 'candle') {
+          chartType = type;
+        }
+      }
+
+      // Resolve token symbols to addresses
+      let token0Address = token0Symbol;
+      let token1Address = token1Symbol;
+
+      // If token looks like a symbol, try to resolve it to an address
+      if (!token0Symbol.startsWith('0x') && token0Symbol.length < 10) {
+        const networkTokens = TOKENS[parseInt(network) as keyof typeof TOKENS];
+        if (networkTokens) {
+          const tokenInfo = networkTokens[token0Symbol.toUpperCase() as keyof typeof networkTokens];
+          if (tokenInfo) {
+            token0Address = tokenInfo.address;
+          } else {
+            addLine(`❌ Token ${token0Symbol.toUpperCase()} not found on network ${network}`, 'error');
+            return;
+          }
+        } else {
+          addLine(`❌ Network ${network} not supported`, 'error');
+          return;
+        }
+      }
+
+      if (!token1Symbol.startsWith('0x') && token1Symbol.length < 10) {
+        const networkTokens = TOKENS[parseInt(network) as keyof typeof TOKENS];
+        if (networkTokens) {
+          const tokenInfo = networkTokens[token1Symbol.toUpperCase() as keyof typeof networkTokens];
+          if (tokenInfo) {
+            token1Address = tokenInfo.address;
+          } else {
+            addLine(`❌ Token ${token1Symbol.toUpperCase()} not found on network ${network}`, 'error');
+            return;
+          }
+        } else {
+          addLine(`❌ Network ${network} not supported`, 'error');
+          return;
+        }
+      }
+
+      addLine(`📈 Opening ${chartType} chart for ${token0Symbol.toUpperCase()}/${token1Symbol.toUpperCase()}`);
+      
+      if (openChartModal) {
+        openChartModal(token0Address, token1Address, network, chartType);
+      } else {
+        addLine('❌ Chart functionality not available', 'error');
+      }
+    },
+
     sleep: async (args: string[]) => {
       const ms = parseInt(args[0]) || 1000;
       addLine(`Sleeping for ${ms}ms...`);
@@ -240,5 +321,5 @@ export const createCommands = (ctx: CommandContext) => {
 export const COMMAND_LIST = [
   'help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 
   'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 
-  'price', 'swap'
+  'price', 'chart', 'swap'
 ];

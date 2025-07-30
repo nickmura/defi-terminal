@@ -7,6 +7,7 @@ import { TOKENS } from '../app/helper';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { createCommands, COMMAND_LIST } from './commands';
+import ChartModal from './ChartModal';
 
 interface TerminalLine {
   id: number;
@@ -55,6 +56,19 @@ export default function Terminal() {
   const [pendingLimitOrder, setPendingLimitOrder] = useState<LimitOrderQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [awaitingRateConfirmation, setAwaitingRateConfirmation] = useState(false);
+  const [chartModal, setChartModal] = useState<{
+    isOpen: boolean;
+    token0: string;
+    token1: string;
+    chainId: string;
+    chartType: 'candle' | 'line';
+  }>({
+    isOpen: false,
+    token0: '',
+    token1: '',
+    chainId: '',
+    chartType: 'candle'
+  });
   const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -597,6 +611,20 @@ export default function Terminal() {
     }
   };
 
+  const openChartModal = (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line') => {
+    setChartModal({
+      isOpen: true,
+      token0,
+      token1,
+      chainId,
+      chartType
+    });
+  };
+
+  const closeChartModal = () => {
+    setChartModal(prev => ({ ...prev, isOpen: false }));
+  };
+
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     
@@ -616,7 +644,8 @@ export default function Terminal() {
       handleClassicSwap,
       handleLimitOrder,
       parseSwapCommand,
-      parseLimitOrderCommand
+      parseLimitOrderCommand,
+      openChartModal
     };
 
     const commands = createCommands(commandContext);
@@ -809,6 +838,15 @@ export default function Terminal() {
       <div className="bg-gray-800 px-4 py-1 border-t border-gray-700 text-xs text-gray-400">
         Tab: autocomplete • Ctrl+L: clear • ↑/↓: history
       </div>
+
+      <ChartModal 
+        isOpen={chartModal.isOpen}
+        onClose={closeChartModal}
+        token0={chartModal.token0}
+        token1={chartModal.token1}
+        chainId={chartModal.chainId}
+        chartType={chartModal.chartType}
+      />
     </div>
   );
 }
