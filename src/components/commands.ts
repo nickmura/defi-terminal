@@ -1,4 +1,4 @@
-import { TOKENS } from '../app/helper';
+import { TOKENS, resolveTokenAddress } from '../app/helper';
 
 // Types for command context
 export interface CommandContext {
@@ -58,6 +58,7 @@ export const createCommands = (ctx: CommandContext) => {
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
       'chart <token0> [token1] [--type candle|line] [--network <name>] - Show price chart (defaults to /USDC)',
+      'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
       'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 
       'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'
     ].forEach(cmd => addLine(cmd)),
@@ -199,17 +200,47 @@ export const createCommands = (ctx: CommandContext) => {
       const networkIndex = args.findIndex(arg => arg === '--network');
       if (networkIndex !== -1 && networkIndex + 1 < args.length) {
         const networkName = args[networkIndex + 1].toLowerCase();
-        if (networkName === 'optimism') network = '10';
-        else if (networkName === 'arbitrum') network = '42161';
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'arb': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'binance': '56',
+          'avalanche': '43114',
+          'avax': '43114'
+        };
+        if (networkMap[networkName]) {
+          network = networkMap[networkName];
+        }
       }
 
       try {
+        let tokenAddress = token;
+        
+        // If it looks like a symbol (not an address), try to resolve it
+        if (!token.startsWith('0x') && token.length < 10) {
+          addLine(`🔍 Resolving ${token.toUpperCase()} address...`);
+          const resolved = await resolveTokenAddress(token, parseInt(network));
+          if (resolved) {
+            tokenAddress = resolved;
+            addLine(`✅ Resolved to: ${resolved}`);
+          } else {
+            addLine(`⚠️  Token not found, trying symbol directly...`);
+            tokenAddress = token; // Fallback to using symbol
+          }
+        }
+
         addLine(`🔍 Getting price for ${token.toUpperCase()}...`);
         
         const response = await fetch(`/api/prices/price_by_token?chainId=${network}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({ token: tokenAddress })
         });
 
         if (!response.ok) {
@@ -219,10 +250,37 @@ export const createCommands = (ctx: CommandContext) => {
         }
 
         const data = await response.json();
-        const networkName = network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : `Chain ${network}`;
+        const getNetworkName = (chainId: string) => {
+          const names: { [key: string]: string } = {
+            '1': 'Ethereum',
+            '137': 'Polygon',
+            '10': 'Optimism',
+            '42161': 'Arbitrum',
+            '8453': 'Base',
+            '56': 'BSC',
+            '43114': 'Avalanche'
+          };
+          return names[chainId] || `Chain ${chainId}`;
+        };
+        const networkName = getNetworkName(network);
+        
+        const price = parseFloat(data.price);
+        
+        // Format price to show significant digits instead of fixed decimal places
+        let formattedPrice;
+        if (price >= 1) {
+          formattedPrice = price.toFixed(4);
+        } else if (price >= 0.01) {
+          formattedPrice = price.toFixed(6);
+        } else if (price >= 0.0001) {
+          formattedPrice = price.toFixed(8);
+        } else {
+          // For very small prices, use toPrecision to show significant digits
+          formattedPrice = price.toPrecision(6);
+        }
         
         addLine(`💰 ${token.toUpperCase()} Price:`);
-        addLine(`   Price: $${parseFloat(data.price).toFixed(4)} USD`);
+        addLine(`   Price: $${formattedPrice} USD`);
         addLine(`   Network: ${networkName}`);
         addLine(`   Address: ${data.token}`);
       } catch (error) {
@@ -248,9 +306,23 @@ export const createCommands = (ctx: CommandContext) => {
       const networkIndex = args.findIndex(arg => arg === '--network');
       if (networkIndex !== -1 && networkIndex + 1 < args.length) {
         const networkName = args[networkIndex + 1].toLowerCase();
-        if (networkName === 'optimism') network = '10';
-        else if (networkName === 'arbitrum') network = '42161';
-        else if (networkName === 'ethereum') network = '1';
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'arb': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'binance': '56',
+          'avalanche': '43114',
+          'avax': '43114'
+        };
+        if (networkMap[networkName]) {
+          network = networkMap[networkName];
+        }
       }
 
       // Check for --type flag
@@ -268,33 +340,25 @@ export const createCommands = (ctx: CommandContext) => {
 
       // If token looks like a symbol, try to resolve it to an address
       if (!token0Symbol.startsWith('0x') && token0Symbol.length < 10) {
-        const networkTokens = TOKENS[parseInt(network) as keyof typeof TOKENS];
-        if (networkTokens) {
-          const tokenInfo = networkTokens[token0Symbol.toUpperCase() as keyof typeof networkTokens];
-          if (tokenInfo) {
-            token0Address = tokenInfo.address;
-          } else {
-            addLine(`❌ Token ${token0Symbol.toUpperCase()} not found on network ${network}`, 'error');
-            return;
-          }
+        addLine(`🔍 Resolving ${token0Symbol.toUpperCase()} address...`);
+        const resolved = await resolveTokenAddress(token0Symbol, parseInt(network));
+        if (resolved) {
+          token0Address = resolved;
         } else {
-          addLine(`❌ Network ${network} not supported`, 'error');
+          addLine(`❌ Token ${token0Symbol.toUpperCase()} not found on network ${network}`, 'error');
+          addLine(`Try using the token's contract address instead`, 'error');
           return;
         }
       }
 
       if (!token1Symbol.startsWith('0x') && token1Symbol.length < 10) {
-        const networkTokens = TOKENS[parseInt(network) as keyof typeof TOKENS];
-        if (networkTokens) {
-          const tokenInfo = networkTokens[token1Symbol.toUpperCase() as keyof typeof networkTokens];
-          if (tokenInfo) {
-            token1Address = tokenInfo.address;
-          } else {
-            addLine(`❌ Token ${token1Symbol.toUpperCase()} not found on network ${network}`, 'error');
-            return;
-          }
+        addLine(`🔍 Resolving ${token1Symbol.toUpperCase()} address...`);
+        const resolved = await resolveTokenAddress(token1Symbol, parseInt(network));
+        if (resolved) {
+          token1Address = resolved;
         } else {
-          addLine(`❌ Network ${network} not supported`, 'error');
+          addLine(`❌ Token ${token1Symbol.toUpperCase()} not found on network ${network}`, 'error');
+          addLine(`Try using the token's contract address instead`, 'error');
           return;
         }
       }

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useSignMessage, useChainId, useSendTransaction, useWriteContract, useReadContract, useWaitForTransactionReceipt, useSwitchChain, useSignTypedData } from 'wagmi';
-import { TOKENS } from '../app/helper';
+import { TOKENS, resolveTokenInfo } from '../app/helper';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { createCommands, COMMAND_LIST } from './commands';
@@ -111,18 +111,48 @@ export default function Terminal() {
     setLines(prev => [...prev, { id, type, content, timestamp: new Date() }]);
   };
 
-  const getTokenAddress = (symbol: string, networkId: number): string | null => {
+  const getTokenAddress = async (symbol: string, networkId: number): Promise<string | null> => {
+    // First check static tokens
     const tokens = TOKENS[networkId as keyof typeof TOKENS];
-    if (!tokens) return null;
-    const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
-    return token ? token.address : null;
+    if (tokens) {
+      const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
+      if (token) return token.address;
+    }
+
+    // Fallback to 1inch API
+    try {
+      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.token.address;
+      }
+    } catch (error) {
+      console.warn('Failed to resolve token from 1inch API:', error);
+    }
+
+    return null;
   };
 
-  const getTokenDecimals = (symbol: string, networkId: number): number => {
+  const getTokenDecimals = async (symbol: string, networkId: number): Promise<number> => {
+    // First check static tokens
     const tokens = TOKENS[networkId as keyof typeof TOKENS];
-    if (!tokens) return 18;
-    const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
-    return token ? token.decimals : 18;
+    if (tokens) {
+      const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
+      if (token) return token.decimals;
+    }
+
+    // Fallback to 1inch API
+    try {
+      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.token.decimals;
+      }
+    } catch (error) {
+      console.warn('Failed to resolve token from 1inch API:', error);
+    }
+
+    return 18; // Default decimals
   };
 
   const parseSwapCommand = (args: string[]) => {
@@ -211,15 +241,16 @@ export default function Terminal() {
     }
 
     try {
-      const srcAddress = getTokenAddress(fromToken, parseInt(network));
-      const dstAddress = getTokenAddress(toToken, parseInt(network));
+      addLine(`🔍 Resolving token addresses...`);
+      const srcAddress = await getTokenAddress(fromToken, parseInt(network));
+      const dstAddress = await getTokenAddress(toToken, parseInt(network));
 
       if (!srcAddress || !dstAddress) {
-        addLine(`❌ Token not supported on network ${network}`, 'error');
+        addLine(`❌ Token not found on network ${network}. Try using contract addresses instead.`, 'error');
         return;
       }
 
-      const decimals = getTokenDecimals(fromToken, parseInt(network));
+      const decimals = await getTokenDecimals(fromToken, parseInt(network));
       const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
 
       // Get prices for both tokens using the new price API
@@ -569,15 +600,16 @@ export default function Terminal() {
     }
 
     try {
-      const srcAddress = getTokenAddress(fromToken, parseInt(network));
-      const dstAddress = getTokenAddress(toToken, parseInt(network));
+      addLine(`🔍 Resolving token addresses...`);
+      const srcAddress = await getTokenAddress(fromToken, parseInt(network));
+      const dstAddress = await getTokenAddress(toToken, parseInt(network));
 
       if (!srcAddress || !dstAddress) {
-        addLine(`❌ Token not supported on network ${network}`, 'error');
+        addLine(`❌ Token not found on network ${network}. Try using contract addresses instead.`, 'error');
         return;
       }
 
-      const decimals = getTokenDecimals(fromToken, parseInt(network));
+      const decimals = await getTokenDecimals(fromToken, parseInt(network));
       const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
 
       const quoteUrl = `/api/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
