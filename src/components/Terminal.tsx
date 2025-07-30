@@ -565,14 +565,14 @@ export default function Terminal() {
       
       const response = await fetch(quoteUrl);
       const data = await response.json();
-
+      console.log('Classic swap quote:', data)
       if (!response.ok) {
         addLine(`❌ Failed to get quote: ${data.error}`, 'error');
         return;
       }
 
-      const toAmount = parseFloat(data.toAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
-      const estimatedGas = data.estimatedGas ? parseInt(data.estimatedGas).toLocaleString() : 'Unknown';
+      const toAmount = parseFloat(data.dstAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
+      const estimatedGas = data.gas ? parseInt(data.gas).toLocaleString() : 'Unknown';
 
       addLine('📊 Quote received:');
       addLine(`   Input: ${amount} ${fromToken.toUpperCase()}`);

@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
 
     // Create the order with SDK
     const limitOrder = await sdk.createOrder(orderInfo, makerTraits);
-    const build = limitOrder.build() // non encoded
-    const extension = limitOrder.extension 
+    const build = limitOrder.build() // non encoded  
+    const extension:Extension = limitOrder.extension 
 
 
     const typedData = limitOrder.getTypedData(fromChainId)
