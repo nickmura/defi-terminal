@@ -52,6 +52,7 @@ export default function Terminal() {
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [pendingSwap, setPendingSwap] = useState<SwapQuote | null>(null);
   const [pendingLimitOrder, setPendingLimitOrder] = useState<LimitOrderQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
@@ -90,17 +91,20 @@ export default function Terminal() {
       }
     } catch (error) {
       console.warn('Failed to load command history from localStorage:', error);
+    } finally {
+      setHistoryLoaded(true);
     }
   }, []);
 
-  // Save command history to localStorage whenever it changes
+  // Save command history to localStorage whenever it changes (but not on initial load)
   useEffect(() => {
+    if (!historyLoaded) return;
     try {
       localStorage.setItem('defi-terminal-history', JSON.stringify(commandHistory));
     } catch (error) {
       console.warn('Failed to save command history to localStorage:', error);
     }
-  }, [commandHistory]);
+  }, [commandHistory, historyLoaded]);
 
   const addLine = (content: string, type: 'command' | 'output' | 'error' = 'output') => {
     const id = lineIdCounterRef.current++;

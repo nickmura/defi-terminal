@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar } from 'recharts';
+import { useState, useEffect, useRef } from 'react';
+import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 
 interface ChartModalProps {
   isOpen: boolean;
@@ -14,17 +14,82 @@ interface ChartModalProps {
 
 
 export default function ChartModal({ isOpen, onClose, token0, token1, chainId, chartType }: ChartModalProps) {
-  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<any>(null);
 
+  // Initialize chart when modal opens
   useEffect(() => {
-    if (isOpen && token0 && token1) {
+    if (isOpen && chartContainerRef.current) {
+      // Clean up existing chart if it exists
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+
+      const chart = createChart(chartContainerRef.current, {
+        layout: {
+          background: { type: ColorType.Solid, color: '#000000' },
+          textColor: '#d1d5db',
+          attributionLogo: false,
+        },
+        grid: {
+          vertLines: { color: '#374151' },
+          horzLines: { color: '#374151' },
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+          borderColor: '#4b5563',
+          autoScale: true,
+          scaleMargins: {
+            top: 0.1,
+            bottom: 0.1,
+          },
+        },
+        timeScale: {
+          borderColor: '#4b5563',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+        width: chartContainerRef.current.clientWidth,
+        height: chartContainerRef.current.clientHeight,
+      });
+
+      chartRef.current = chart;
+    }
+  }, [isOpen]);
+
+  // Fetch and update chart data
+  useEffect(() => {
+    if (isOpen && token0 && token1 && chartRef.current) {
       fetchChartData();
     }
   }, [isOpen, token0, token1, chainId, chartType]);
 
+  // Cleanup chart when modal closes or component unmounts
+  useEffect(() => {
+    if (!isOpen && chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+  }, [isOpen]);
+
+  // Cleanup chart on unmount
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, []);
+
   const fetchChartData = async () => {
+    if (!chartRef.current) return;
+    
     setLoading(true);
     setError(null);
     
@@ -34,7 +99,7 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
         token0,
         token1,
         chainId,
-        ...(chartType === 'candle' ? { seconds: '300' } : { period: '1D' })
+        ...(chartType === 'candle' ? { seconds: '3600' } : { period: '24H' })
       });
 
       const response = await fetch(`${endpoint}?${params}`);
@@ -43,57 +108,113 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
       }
 
       const data = await response.json();
-      
-      console.log('Chart API response:', data);
-      console.log('Data type:', typeof data);
-      console.log('Candles property:', data.candles);
-      console.log('Candles type:', typeof data.candles);
-      console.log('Is candles array?', Array.isArray(data.candles));
+      console.log('Chart data received:', data); // Debug log
       
       if (chartType === 'candle') {
-        // Transform candle data for recharts
+        // Process candle data for Lightweight Charts
         const candles = data.candles?.data || data.candles;
         if (Array.isArray(candles) && candles.length > 0) {
-          console.log('First candle:', candles[0]);
-          const transformedData = candles.map((candle: any) => ({
-            timestamp: candle.time * 1000, // Convert to milliseconds (using 'time' not 'timestamp')
-            time: new Date(candle.time * 1000).toLocaleTimeString(),
+          const candlestickSeries = chartRef.current.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderDownColor: '#ef4444',
+            borderUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+            wickUpColor: '#10b981',
+          });
+          
+          // Transform data for Lightweight Charts with outlier filtering
+          const rawData = candles.map((candle: any) => ({
+            time: candle.time,
             open: parseFloat(candle.open),
             high: parseFloat(candle.high),
             low: parseFloat(candle.low),
             close: parseFloat(candle.close),
           }));
-          console.log('Transformed data sample:', transformedData.slice(0, 2));
-          setChartData(transformedData);
+
+          // Filter out extreme outliers that distort the chart
+          const allPrices = rawData.flatMap(candle => [candle.open, candle.high, candle.low, candle.close]);
+          allPrices.sort((a, b) => a - b);
+          
+          // Calculate quartiles
+          const q1Index = Math.floor(allPrices.length * 0.25);
+          const q3Index = Math.floor(allPrices.length * 0.75);
+          const q1 = allPrices[q1Index];
+          const q3 = allPrices[q3Index];
+          const iqr = q3 - q1;
+          
+          // Define outlier thresholds (more aggressive filtering)
+          const lowerBound = q1 - 3 * iqr;
+          const upperBound = q3 + 3 * iqr;
+          
+          // Filter and cap extreme values
+          const chartData = rawData.map(candle => ({
+            time: candle.time,
+            open: Math.min(Math.max(candle.open, lowerBound), upperBound),
+            high: Math.min(Math.max(candle.high, lowerBound), upperBound),
+            low: Math.min(Math.max(candle.low, lowerBound), upperBound),
+            close: Math.min(Math.max(candle.close, lowerBound), upperBound),
+          }));
+
+          console.log(`Filtered candles: ${rawData.length} -> ${chartData.length}, bounds: ${lowerBound.toFixed(6)} - ${upperBound.toFixed(6)}`);
+          
+          candlestickSeries.setData(chartData);
         } else {
-          console.error('Candle data issue:', {
-            candles,
-            isArray: Array.isArray(candles),
-            length: candles?.length,
-            type: typeof candles
-          });
-          setError(`Invalid candle data: ${Array.isArray(candles) ? 'empty array' : 'not an array'}`);
+          setError('No candle data available');
         }
       } else {
-        // Transform line data for recharts
-        const lineData = data.lineData?.data || data.lineData;
+        // Process line data for Lightweight Charts
+        console.log('Processing line chart data:', data); // Debug log
+        
+        if (!chartRef.current) {
+          setError('Chart instance not available');
+          return;
+        }
+        
+        // Try multiple possible data structures from 1inch API
+        let lineData = null;
+        if (data.lineData?.data) {
+          lineData = data.lineData.data;
+        } else if (data.lineData) {
+          lineData = data.lineData;
+        } else if (data.data) {
+          lineData = data.data;
+        } else if (Array.isArray(data)) {
+          lineData = data;
+        }
+        
+        console.log('Line data found:', lineData); // Debug log
+        
         if (Array.isArray(lineData) && lineData.length > 0) {
-          const transformedData = lineData.map((point: any) => ({
-            timestamp: point.time * 1000, // Using 'time' property
-            time: new Date(point.time * 1000).toLocaleTimeString(),
-            price: parseFloat(point.price),
-          }));
-          setChartData(transformedData);
-        } else {
-          console.error('Line data issue:', {
-            lineData,
-            isArray: Array.isArray(lineData),
-            length: lineData?.length,
-            type: typeof lineData
+          const lineSeries = chartRef.current.addLineSeries({
+            color: '#10b981',
+            lineWidth: 2,
           });
-          setError(`Invalid line data: ${Array.isArray(lineData) ? 'empty array' : 'not an array'}`);
+          
+          // Try different possible field names for price and time
+          const chartData = lineData.map((point: any) => {
+            const time = point.time || point.timestamp || point.t;
+            const price = point.price || point.value || point.close || point.p;
+            
+            return {
+              time: time,
+              value: parseFloat(price),
+            };
+          });
+          
+          console.log('Line chart data processed:', chartData.slice(0, 5)); // Debug log (first 5 items)
+          lineSeries.setData(chartData);
+        } else {
+          console.log('No line data available or invalid format'); // Debug log
+          setError('No line data available');
         }
       }
+      
+      // Fit content and auto-scale the chart
+      chartRef.current.timeScale().fitContent();
+      chartRef.current.priceScale('right').applyOptions({
+        autoScale: true,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -124,96 +245,31 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
         </div>
 
         {/* Chart Content */}
-        <div className="flex-1 p-4 bg-black text-green-400 font-mono">
+        <div className="flex-1 p-4 bg-black text-green-400 font-mono relative">
           {loading && (
-            <div className="flex items-center justify-center h-full">
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
               <div className="text-green-400">Loading chart data...</div>
             </div>
           )}
 
           {error && (
-            <div className="flex items-center justify-center h-full">
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
               <div className="text-red-400">Error: {error}</div>
             </div>
           )}
 
-          {!loading && !error && chartData.length > 0 && (
-            <div className="h-full">
-              <ResponsiveContainer width="100%" height="100%">
-                {chartType === 'candle' ? (
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis 
-                      dataKey="time" 
-                      stroke="#9ca3af"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      domain={['dataMin - 0.1', 'dataMax + 0.1']}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #4b5563',
-                        borderRadius: '4px',
-                        color: '#10b981'
-                      }}
-                      formatter={(value, name) => [value, String(name).toUpperCase()]}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="close" 
-                      stroke="#10b981" 
-                      strokeWidth={1}
-                      dot={false}
-                    />
-                  </ComposedChart>
-                ) : (
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis 
-                      dataKey="time" 
-                      stroke="#9ca3af"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="#9ca3af"
-                      fontSize={12}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #4b5563',
-                        borderRadius: '4px',
-                        color: '#10b981'
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="price" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </ComposedChart>
-                )}
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {!loading && !error && chartData.length === 0 && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-400">No chart data available</div>
-            </div>
-          )}
+          {/* Chart Container */}
+          <div 
+            ref={chartContainerRef}
+            className="w-full h-full"
+            style={{ minHeight: '400px' }}
+          />
         </div>
 
         {/* Status Bar */}
         <div className="bg-gray-800 border-t border-gray-600 px-4 py-2 text-xs text-gray-400 rounded-b-lg">
           Network: {chainId === '1' ? 'Ethereum' : chainId === '10' ? 'Optimism' : 'Arbitrum'} | 
-          Data points: {chartData.length} | 
+          Chart Type: {chartType === 'candle' ? 'Candlestick' : 'Line'} | 
           Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>

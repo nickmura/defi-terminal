@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const token0 = searchParams.get('token0');
     const token1 = searchParams.get('token1');
-    const period = searchParams.get('period') || '1D'; // Default to 1 day
+    const period = searchParams.get('period') || '24H'; // Default to 24 hours
     const chainId = searchParams.get('chainId') || '1'; // Default to Ethereum
     
     if (!token0 || !token1) {
