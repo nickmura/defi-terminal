@@ -17,7 +17,7 @@ export interface CommandContext {
   handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => Promise<void>;
   parseSwapCommand: (args: string[]) => any;
   parseLimitOrderCommand: (args: string[]) => any;
-  openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line') => void;
+  openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string) => void;
 }
 
 export const createCommands = (ctx: CommandContext) => {
@@ -57,7 +57,8 @@ export const createCommands = (ctx: CommandContext) => {
       'balance - Show wallet balance', 
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
-      'chart <token0> [token1] [--type candle|line] [--network <name>] - Show price chart (defaults to /USDC)',
+      'chart <token0> [token1] [--type candle|line] [--interval <time>] [--network <name>] - Show price chart (defaults to /USDC)',
+      'Intervals: 5m, 15m, 1h, 4h, 1d, 1w (default: 1h for candles)',
       'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
       'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 
       'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'
@@ -301,6 +302,7 @@ export const createCommands = (ctx: CommandContext) => {
       const token1Symbol = args[1] || 'usdc'; // Default to USDC
       let network = chainId.toString();
       let chartType: 'candle' | 'line' = 'candle';
+      let interval = '1h'; // Default interval
 
       // Check for --network flag
       const networkIndex = args.findIndex(arg => arg === '--network');
@@ -334,6 +336,23 @@ export const createCommands = (ctx: CommandContext) => {
         }
       }
 
+      // Check for --interval flag
+      const intervalIndex = args.findIndex(arg => arg === '--interval');
+      if (intervalIndex !== -1 && intervalIndex + 1 < args.length) {
+        const inputInterval = args[intervalIndex + 1].toLowerCase();
+        const validIntervals = ['5m', '15m', '1h', '4h', '1d', '1w'];
+        if (validIntervals.includes(inputInterval)) {
+          interval = inputInterval;
+          // Warn about 5m interval issue
+          if (inputInterval === '5m') {
+            addLine('⚠️  Note: 5m interval has API issues, using 15m data instead');
+          }
+        } else {
+          addLine(`❌ Invalid interval: ${inputInterval}. Valid options: ${validIntervals.join(', ')}`, 'error');
+          return;
+        }
+      }
+
       // Resolve token symbols to addresses
       let token0Address = token0Symbol;
       let token1Address = token1Symbol;
@@ -363,10 +382,11 @@ export const createCommands = (ctx: CommandContext) => {
         }
       }
 
-      addLine(`📈 Opening ${chartType} chart for ${token0Symbol.toUpperCase()}/${token1Symbol.toUpperCase()}`);
+      const intervalText = chartType === 'candle' ? ` (${interval} intervals)` : '';
+      addLine(`📈 Opening ${chartType} chart for ${token0Symbol.toUpperCase()}/${token1Symbol.toUpperCase()}${intervalText}`);
       
       if (openChartModal) {
-        openChartModal(token0Address, token1Address, network, chartType);
+        openChartModal(token0Address, token1Address, network, chartType, interval);
       } else {
         addLine('❌ Chart functionality not available', 'error');
       }

@@ -10,10 +10,11 @@ interface ChartModalProps {
   token1: string;
   chainId: string;
   chartType: 'candle' | 'line';
+  interval?: string;
 }
 
 
-export default function ChartModal({ isOpen, onClose, token0, token1, chainId, chartType }: ChartModalProps) {
+export default function ChartModal({ isOpen, onClose, token0, token1, chainId, chartType, interval = '1h' }: ChartModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -48,6 +49,12 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
             top: 0.1,
             bottom: 0.1,
           },
+          // Custom price formatter for small decimal values
+          priceFormat: {
+            type: 'price',
+            precision: 10, // Start with high precision, will be overridden dynamically
+            minMove: 0.0000000001, // Support very small price movements
+          },
         },
         timeScale: {
           borderColor: '#4b5563',
@@ -67,7 +74,7 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
     if (isOpen && token0 && token1 && chartRef.current) {
       fetchChartData();
     }
-  }, [isOpen, token0, token1, chainId, chartType]);
+  }, [isOpen, token0, token1, chainId, chartType, interval]);
 
   // Cleanup chart when modal closes or component unmounts
   useEffect(() => {
@@ -87,6 +94,19 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
     };
   }, []);
 
+  // Convert interval to seconds for candle charts
+  const intervalToSeconds = (interval: string): string => {
+    const intervalMap: { [key: string]: string } = {
+      '5m': '900',    // 5 minutes aliased to 15m due to 1inch API issue
+      '15m': '900',   // 15 minutes  
+      '1h': '3600',   // 1 hour
+      '4h': '14400',  // 4 hours
+      '1d': '86400',  // 1 day
+      '1w': '604800'  // 1 week
+    };
+    return intervalMap[interval] || '3600'; // Default to 1 hour
+  };
+
   const fetchChartData = async () => {
     if (!chartRef.current) return;
     
@@ -99,7 +119,7 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
         token0,
         token1,
         chainId,
-        ...(chartType === 'candle' ? { seconds: '3600' } : { period: '24H' })
+        ...(chartType === 'candle' ? { seconds: intervalToSeconds(interval) } : { period: 'AllTime' })
       });
 
       const response = await fetch(`${endpoint}?${params}`);
@@ -114,15 +134,6 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
         // Process candle data for Lightweight Charts
         const candles = data.candles?.data || data.candles;
         if (Array.isArray(candles) && candles.length > 0) {
-          const candlestickSeries = chartRef.current.addCandlestickSeries({
-            upColor: '#10b981',
-            downColor: '#ef4444',
-            borderDownColor: '#ef4444',
-            borderUpColor: '#10b981',
-            wickDownColor: '#ef4444',
-            wickUpColor: '#10b981',
-          });
-          
           // Transform data for Lightweight Charts with outlier filtering
           const rawData = candles.map((candle: any) => ({
             time: candle.time,
@@ -143,20 +154,62 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
           const q3 = allPrices[q3Index];
           const iqr = q3 - q1;
           
-          // Define outlier thresholds (more aggressive filtering)
-          const lowerBound = q1 - 3 * iqr;
-          const upperBound = q3 + 3 * iqr;
+          // Define outlier thresholds (less aggressive filtering)
+          const lowerBound = q1 - 5 * iqr; // Increased from 3 to 5
+          const upperBound = q3 + 5 * iqr; // Increased from 3 to 5
           
-          // Filter and cap extreme values
-          const chartData = rawData.map(candle => ({
+          // Filter out only extreme outliers, keep most data
+          const chartData = rawData.filter(candle => {
+            const prices = [candle.open, candle.high, candle.low, candle.close];
+            const hasExtreme = prices.some(price => price < lowerBound || price > upperBound);
+            return !hasExtreme; // Only remove candles with extreme outlier prices
+          }).map(candle => ({
             time: candle.time,
-            open: Math.min(Math.max(candle.open, lowerBound), upperBound),
-            high: Math.min(Math.max(candle.high, lowerBound), upperBound),
-            low: Math.min(Math.max(candle.low, lowerBound), upperBound),
-            close: Math.min(Math.max(candle.close, lowerBound), upperBound),
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
           }));
 
           console.log(`Filtered candles: ${rawData.length} -> ${chartData.length}, bounds: ${lowerBound.toFixed(6)} - ${upperBound.toFixed(6)}`);
+          
+          // Determine appropriate precision based on price range
+          const maxPrice = Math.max(...chartData.map(c => Math.max(c.open, c.high, c.low, c.close)));
+          const minPrice = Math.min(...chartData.map(c => Math.min(c.open, c.high, c.low, c.close)));
+          
+          let precision = 2;
+          let minMove = 0.01;
+          
+          if (maxPrice < 0.001) {
+            precision = 10;
+            minMove = 0.0000000001;
+          } else if (maxPrice < 0.01) {
+            precision = 8;
+            minMove = 0.00000001;
+          } else if (maxPrice < 0.1) {
+            precision = 6;
+            minMove = 0.000001;
+          } else if (maxPrice < 1) {
+            precision = 4;
+            minMove = 0.0001;
+          }
+          
+          console.log(`Price range: ${minPrice.toFixed(10)} - ${maxPrice.toFixed(10)}, using precision: ${precision}`);
+          
+          // Create candlestick series with proper price formatting
+          const candlestickSeries = chartRef.current.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderDownColor: '#ef4444',
+            borderUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+            wickUpColor: '#10b981',
+            priceFormat: {
+              type: 'price',
+              precision: precision,
+              minMove: minMove,
+            },
+          });
           
           candlestickSeries.setData(chartData);
         } else {
@@ -186,10 +239,6 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
         console.log('Line data found:', lineData); // Debug log
         
         if (Array.isArray(lineData) && lineData.length > 0) {
-          const lineSeries = chartRef.current.addLineSeries({
-            color: '#10b981',
-            lineWidth: 2,
-          });
           
           // Try different possible field names for price and time
           const chartData = lineData.map((point: any) => {
@@ -203,6 +252,44 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
           });
           
           console.log('Line chart data processed:', chartData.slice(0, 5)); // Debug log (first 5 items)
+          
+          // Determine appropriate precision for line chart based on price range
+          const prices = chartData.map(point => point.value).filter(v => !isNaN(v) && v > 0);
+          let precision = 2;
+          let minMove = 0.01;
+          
+          if (prices.length > 0) {
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+            
+            if (maxPrice < 0.001) {
+              precision = 10;
+              minMove = 0.0000000001;
+            } else if (maxPrice < 0.01) {
+              precision = 8;
+              minMove = 0.00000001;
+            } else if (maxPrice < 0.1) {
+              precision = 6;
+              minMove = 0.000001;
+            } else if (maxPrice < 1) {
+              precision = 4;
+              minMove = 0.0001;
+            }
+            
+            console.log(`Line price range: ${minPrice.toFixed(10)} - ${maxPrice.toFixed(10)}, using precision: ${precision}`);
+          }
+          
+          // Create line series with proper price formatting
+          const lineSeries = chartRef.current.addLineSeries({
+            color: '#10b981',
+            lineWidth: 2,
+            priceFormat: {
+              type: 'price',
+              precision: precision,
+              minMove: minMove,
+            },
+          });
+          
           lineSeries.setData(chartData);
         } else {
           console.log('No line data available or invalid format'); // Debug log

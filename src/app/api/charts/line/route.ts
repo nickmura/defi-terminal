@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const token0 = searchParams.get('token0');
     const token1 = searchParams.get('token1');
-    const period = searchParams.get('period') || '24H'; // Default to 24 hours
+    const period = searchParams.get('period') || 'AllTime'; // Default to all time
     const chainId = searchParams.get('chainId') || '1'; // Default to Ethereum
     
     if (!token0 || !token1) {
@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Use the documented parameters: token0, token1, period, chainId
     const url = `${BASE_URL}/${token0}/${token1}/${period}/${chainId}`;
+    
+    console.log('Line chart API URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -46,6 +49,15 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    
+    // Log data points count for debugging
+    if (Array.isArray(data)) {
+      console.log(`Line chart received ${data.length} data points`);
+    } else if (data.data && Array.isArray(data.data)) {
+      console.log(`Line chart received ${data.data.length} data points`);
+    } else {
+      console.log('Line chart data structure:', Object.keys(data));
+    }
     
     return NextResponse.json({
       token0,

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const token0 = searchParams.get('token0');
     const token1 = searchParams.get('token1');
-    const seconds = searchParams.get('seconds') || '300'; // Default to 5 minutes
+    const seconds = searchParams.get('seconds') || '3600'; // Default to 1 hour
     const chainId = searchParams.get('chainId') || '1'; // Default to Ethereum
     console.log(token0, token1)
     if (!token0 || !token1) {
@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Use only the 4 documented parameters: token0, token1, seconds, chainId
     const url = `${BASE_URL}/${token0}/${token1}/${seconds}/${chainId}`;
+    
+    console.log('Candle chart API URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -46,6 +49,17 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    
+    // Log data points count for debugging
+    if (data.candles && Array.isArray(data.candles)) {
+      console.log(`Candle chart received ${data.candles.length} candles`);
+    } else if (data.data && Array.isArray(data.data)) {
+      console.log(`Candle chart received ${data.data.length} candles`);
+    } else if (Array.isArray(data)) {
+      console.log(`Candle chart received ${data.length} candles`);
+    } else {
+      console.log('Candle chart data structure:', Object.keys(data));
+    }
     
     return NextResponse.json({
       token0,

@@ -63,12 +63,14 @@ export default function Terminal() {
     token1: string;
     chainId: string;
     chartType: 'candle' | 'line';
+    interval: string;
   }>({
     isOpen: false,
     token0: '',
     token1: '',
     chainId: '',
-    chartType: 'candle'
+    chartType: 'candle',
+    interval: '1h'
   });
   const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
@@ -647,13 +649,14 @@ export default function Terminal() {
     }
   };
 
-  const openChartModal = (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line') => {
+  const openChartModal = (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval: string = '1h') => {
     setChartModal({
       isOpen: true,
       token0,
       token1,
       chainId,
-      chartType
+      chartType,
+      interval
     });
   };
 
@@ -882,6 +885,7 @@ export default function Terminal() {
         token1={chartModal.token1}
         chainId={chartModal.chainId}
         chartType={chartModal.chartType}
+        interval={chartModal.interval}
       />
     </div>
   );
