@@ -54,7 +54,8 @@ export const createCommands = (ctx: CommandContext) => {
       'history - Command history', 
       'history clear - Clear command history', 
       'curl <url> - HTTP request', 
-      'sleep <ms> - Wait', 
+      'sleep <ms> - Wait',
+      'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls', 
       'wallet - Show wallet info', 
       'balance - Show ETH balance', 
       'message <text> - Sign message (requires wallet)', 
@@ -427,6 +428,126 @@ export const createCommands = (ctx: CommandContext) => {
       addLine(`Sleeping for ${ms}ms...`);
       await new Promise(resolve => setTimeout(resolve, ms));
       addLine('Done!');
+    },
+
+    rpc: async (args: string[]) => {
+      if (args.length === 0) {
+        addLine('Usage: rpc <method> [params...] [--network <chain>]', 'error');
+        addLine('');
+        addLine('Examples:');
+        addLine('  rpc eth_blockNumber');
+        addLine('  rpc eth_getBalance 0x742d35Cc6634C0532925a3b844Bc9e7595f62a40 latest');
+        addLine('  rpc eth_getCode 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 latest');
+        addLine('  rpc eth_call {"to":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","data":"0x18160ddd"} latest');
+        addLine('  rpc eth_getBalance 0x742d35Cc6634C0532925a3b844Bc9e7595f62a40 0x1234567 --network ethereum');
+        return;
+      }
+
+      const method = args[0];
+      let params: any[] = [];
+      let network = chainId.toString();
+
+      // Find --network flag
+      const networkIndex = args.findIndex(arg => arg === '--network');
+      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+        const networkName = args[networkIndex + 1].toLowerCase();
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'avalanche': '43114'
+        };
+        network = networkMap[networkName] || networkName;
+        
+        // Remove network args from params
+        args = args.slice(1, networkIndex);
+      } else {
+        args = args.slice(1);
+      }
+
+      // Parse parameters
+      for (const arg of args) {
+        // Try to parse as JSON first (for objects)
+        if (arg.startsWith('{') || arg.startsWith('[')) {
+          try {
+            params.push(JSON.parse(arg));
+          } catch {
+            params.push(arg);
+          }
+        } else {
+          params.push(arg);
+        }
+      }
+
+      addLine(`🔄 Executing RPC: ${method} on chain ${network}`);
+      
+      try {
+        const response = await fetch(`/api/eth_rpc?chainId=${network}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: method,
+            params: params,
+            id: Date.now()
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          addLine(`❌ RPC Error: ${error.error?.message || 'Unknown error'}`, 'error');
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+          addLine(`❌ RPC Error: ${data.error.message}`, 'error');
+          if (data.error.data) {
+            addLine(`Details: ${data.error.data}`, 'error');
+          }
+          return;
+        }
+
+        // Format the result based on the method
+        addLine('✅ RPC Result:');
+        
+        if (method === 'eth_blockNumber') {
+          addLine(`  Block Number: ${data.result}`);
+          if (data.resultHex) {
+            addLine(`  Hex: ${data.resultHex}`);
+          }
+        } else if (method === 'eth_getBalance') {
+          if (typeof data.result === 'object') {
+            addLine(`  Balance: ${data.result.ether} ETH`);
+            addLine(`  Wei: ${data.result.wei}`);
+            addLine(`  Hex: ${data.result.hex}`);
+          } else {
+            addLine(`  Result: ${data.result}`);
+          }
+        } else if (method === 'eth_getCode') {
+          const code = data.result;
+          if (code === '0x') {
+            addLine('  No contract code (EOA address)');
+          } else {
+            addLine(`  Contract bytecode: ${code.slice(0, 66)}...`);
+            addLine(`  Size: ${(code.length - 2) / 2} bytes`);
+          }
+        } else {
+          // Generic result display
+          addLine(`  Result: ${JSON.stringify(data.result, null, 2)}`);
+        }
+
+      } catch (error) {
+        addLine(`❌ Failed to execute RPC: ${error}`, 'error');
+      }
     }
   };
 };
@@ -435,5 +556,5 @@ export const createCommands = (ctx: CommandContext) => {
 export const COMMAND_LIST = [
   'help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 
   'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 
-  'price', 'chart', 'swap'
+  'price', 'chart', 'swap', 'rpc'
 ];
