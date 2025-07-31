@@ -872,11 +872,20 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
 
   return (
     <div className="w-full h-full bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
-      <div ref={terminalRef} className="flex-1 p-4 overflow-y-auto cursor-text" onClick={() => inputRef.current?.focus()}>
+      <div 
+        ref={terminalRef} 
+        className="flex-1 p-4 overflow-y-auto cursor-text" 
+        onClick={(e) => {
+          // Only focus input if not selecting text
+          if (window.getSelection()?.toString() === '') {
+            inputRef.current?.focus();
+          }
+        }}
+      >
         {lines.map((line) => (
           <div key={line.id} className="flex items-start space-x-2 mb-1">
             <Timestamp timestamp={line.timestamp} />
-            <span className={`flex-1 ${
+            <span className={`flex-1 select-text ${
               line.type === 'command' ? 'text-white' :
               line.type === 'error' ? 'text-red-400' : 'text-gray-300'
             }`}>

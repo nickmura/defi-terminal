@@ -56,7 +56,7 @@ export const createCommands = (ctx: CommandContext) => {
       'curl <url> - HTTP request', 
       'sleep <ms> - Wait', 
       'wallet - Show wallet info', 
-      'balance - Show wallet balance', 
+      'balance - Show ETH balance', 
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
       'chart <token0> [token1] [--type candle|line] [--interval <time>] [--network <name>] - Show price chart (defaults to /USDC)',
@@ -106,7 +106,22 @@ export const createCommands = (ctx: CommandContext) => {
         addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
       } else if (balance) {
         const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
-        addLine(`${formattedBalance} ${balance.symbol}`);
+        const getNetworkName = (chainId: number) => {
+          const names: { [key: number]: string } = {
+            1: 'Ethereum',
+            137: 'Polygon',
+            10: 'Optimism',
+            42161: 'Arbitrum',
+            8453: 'Base',
+            56: 'BSC',
+            43114: 'Avalanche'
+          };
+          return names[chainId] || `Chain ${chainId}`;
+        };
+        
+        addLine(`💰 ${formattedBalance} ${balance.symbol}`);
+        addLine(`🌐 Network: ${getNetworkName(chainId)}`);
+        addLine(`💳 Address: ${address?.slice(0, 6)}...${address?.slice(-4)}`);
       } else {
         addLine('Balance not available');
       }
