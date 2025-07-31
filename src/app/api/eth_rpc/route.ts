@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ONEINCH_API_BASE = 'https://api.1inch.dev';
+const ONEINCH_API_BASE = 'https://api.1inch.dev/web3';
 
 // RPC methods that support historical block queries
 const HISTORICAL_METHODS = [
@@ -19,10 +19,10 @@ interface RPCRequest {
 
 async function getLatestBlockNumber(chainId: string): Promise<number> {
   try {
-    const url = new URL(`${ONEINCH_API_BASE}/v1.0/${chainId}`);
-    url.searchParams.append('nodeType', 'full');
+    // Use the correct 1inch RPC endpoint format
+    const url = `${ONEINCH_API_BASE}/${chainId}/full`;
     
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.ONEINCH_API_KEY}`,
@@ -155,11 +155,13 @@ export async function POST(request: NextRequest) {
     console.log(`Using ${nodeType} node for ${body.method} (latest block: ${latestBlock})`);
 
 
-    // Make the RPC call to 1inch with nodeType as query parameter
-    const url = new URL(`${ONEINCH_API_BASE}/v1.0/${chainId}`);
-    url.searchParams.append('nodeType', nodeType);
+    // Make the RPC call to 1inch with nodeType as path parameter
+    // Based on the 1inch docs: https://api.1inch.dev/{chainId}/{nodeType}
+    const url = `${ONEINCH_API_BASE}/${chainId}/${nodeType}`;
     
-    const response = await fetch(url.toString(), {
+    console.log(`Calling 1inch RPC endpoint: ${url}`);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
