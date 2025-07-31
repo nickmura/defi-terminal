@@ -1,6 +1,6 @@
-import Terminal from "@/components/Terminal";
+import TabbedTerminal from "@/components/TabbedTerminal";
 import Image from "next/image";
 
 export default function Home() {
-  return ( <Terminal/> );
+  return ( <TabbedTerminal/> );
 }

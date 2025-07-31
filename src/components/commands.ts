@@ -18,6 +18,7 @@ export interface CommandContext {
   parseSwapCommand: (args: string[]) => any;
   parseLimitOrderCommand: (args: string[]) => any;
   openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string) => void;
+  updateTabName?: (operation: string, details?: string) => void;
 }
 
 export const createCommands = (ctx: CommandContext) => {
@@ -37,7 +38,8 @@ export const createCommands = (ctx: CommandContext) => {
     handleLimitOrder,
     parseSwapCommand,
     parseLimitOrderCommand,
-    openChartModal
+    openChartModal,
+    updateTabName
   } = ctx;
 
   return {
@@ -153,6 +155,7 @@ export const createCommands = (ctx: CommandContext) => {
         }
 
         const { amount, fromToken, toToken, network, slippage } = parsed;
+        updateTabName?.('swap', 'classic');
         await handleClassicSwap(amount, fromToken, toToken, network, slippage);
         
       } else if (args[0] === 'limit') {
@@ -164,6 +167,7 @@ export const createCommands = (ctx: CommandContext) => {
         }
 
         const { amount, fromToken, toToken, network, rate } = parsed;
+        updateTabName?.('swap', 'limit');
         await handleLimitOrder(amount, fromToken, toToken, network, rate);
         
       } else {
@@ -238,6 +242,9 @@ export const createCommands = (ctx: CommandContext) => {
 
         addLine(`🔍 Getting price for ${token.toUpperCase()}...`);
         
+        // Update tab name temporarily for price operation
+        updateTabName?.('price', token.toLowerCase());
+        
         const response = await fetch(`/api/prices/price_by_token?chainId=${network}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -284,8 +291,13 @@ export const createCommands = (ctx: CommandContext) => {
         addLine(`   Price: $${formattedPrice} USD`);
         addLine(`   Network: ${networkName}`);
         addLine(`   Address: ${data.token}`);
+        
+        // Reset tab name after price operation
+        updateTabName?.('defi');
       } catch (error) {
         addLine(`❌ Error getting price: ${error}`, 'error');
+        // Reset tab name on error too
+        updateTabName?.('defi');
       }
     },
 
@@ -384,6 +396,9 @@ export const createCommands = (ctx: CommandContext) => {
 
       const intervalText = chartType === 'candle' ? ` (${interval} intervals)` : '';
       addLine(`📈 Opening ${chartType} chart for ${token0Symbol.toUpperCase()}/${token1Symbol.toUpperCase()}${intervalText}`);
+      
+      // Update tab name to show chart operation
+      updateTabName?.('chart', `${token0Symbol.toLowerCase()}`);
       
       if (openChartModal) {
         openChartModal(token0Address, token1Address, network, chartType, interval);

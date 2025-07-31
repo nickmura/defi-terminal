@@ -130,6 +130,28 @@ export const resolveTokenAddress = async (symbol: string, chainId: number): Prom
   return null;
 };
 
+
+  export const getTokenDecimals = async (symbol: string, networkId: number): Promise<number> => {
+    // First check static tokens
+    const tokens = TOKENS[networkId as keyof typeof TOKENS];
+    if (tokens) {
+      const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
+      if (token) return token.decimals;
+    }
+
+    // Fallback to 1inch API
+    try {
+      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.token.decimals;
+      }
+    } catch (error) {
+      console.warn('Failed to resolve token from 1inch API:', error);
+    }
+
+    return 18; // Default decimals
+  };
 // Enhanced token info resolution with 1inch API fallback
 export const resolveTokenInfo = async (symbol: string, chainId: number): Promise<{ address: string; decimals: number } | null> => {
   // First check static token list

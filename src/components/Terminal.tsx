@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useSignMessage, useChainId, useSendTransaction, useWriteContract, useReadContract, useWaitForTransactionReceipt, useSwitchChain, useSignTypedData } from 'wagmi';
-import { TOKENS, resolveTokenInfo } from '../app/helper';
+import { TOKENS, getTokenDecimals, resolveTokenInfo } from '../app/helper';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { createCommands, COMMAND_LIST } from './commands';
@@ -34,7 +34,12 @@ interface LimitOrderQuote {
   quote: any;
 }
 
-export default function Terminal() {
+interface TerminalProps {
+  tabId?: string;
+  onTabNameChange?: (tabId: string, newName: string) => void;
+}
+
+export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {}) {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
   const { signMessageAsync } = useSignMessage();
@@ -53,6 +58,7 @@ export default function Terminal() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [pendingSwap, setPendingSwap] = useState<SwapQuote | null>(null);
   const [pendingLimitOrder, setPendingLimitOrder] = useState<LimitOrderQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
@@ -75,6 +81,42 @@ export default function Terminal() {
   const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Safe timestamp component to avoid hydration mismatch
+  const Timestamp = ({ timestamp }: { timestamp: Date }) => {
+    if (!mounted) return <span className="text-gray-500 text-xs min-w-[60px]">00:00:00</span>;
+    
+    return (
+      <span className="text-gray-500 text-xs min-w-[60px]">
+        {timestamp.toLocaleTimeString('en-US', { 
+          hour12: false, 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit' 
+        })}
+      </span>
+    );
+  };
+
+  // Safe current time component
+  const CurrentTime = () => {
+    if (!mounted) return <span className="text-gray-500 text-xs min-w-[60px]">00:00:00</span>;
+    
+    return (
+      <span className="text-gray-500 text-xs min-w-[60px]">
+        {new Date().toLocaleTimeString('en-US', { 
+          hour12: false, 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit' 
+        })}
+      </span>
+    );
+  };
 
   useEffect(() => {
     terminalRef.current?.scrollTo(0, terminalRef.current.scrollHeight);
@@ -135,27 +177,7 @@ export default function Terminal() {
     return null;
   };
 
-  const getTokenDecimals = async (symbol: string, networkId: number): Promise<number> => {
-    // First check static tokens
-    const tokens = TOKENS[networkId as keyof typeof TOKENS];
-    if (tokens) {
-      const token = tokens[symbol.toUpperCase() as keyof typeof tokens];
-      if (token) return token.decimals;
-    }
 
-    // Fallback to 1inch API
-    try {
-      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.token.decimals;
-      }
-    } catch (error) {
-      console.warn('Failed to resolve token from 1inch API:', error);
-    }
-
-    return 18; // Default decimals
-  };
 
   const parseSwapCommand = (args: string[]) => {
     if (args.length < 4) return null;
@@ -339,10 +361,10 @@ export default function Terminal() {
         return; // Network switch failed or was cancelled
       }
       
-      const srcAddress = getTokenAddress(swapQuote.fromToken, parseInt(swapQuote.network));
-      const dstAddress = getTokenAddress(swapQuote.toToken, parseInt(swapQuote.network));
-      const decimals = getTokenDecimals(swapQuote.fromToken, parseInt(swapQuote.network));
-      const amountWei = parseUnits(swapQuote.amount, decimals);
+      const srcAddress = await getTokenAddress(swapQuote.fromToken, parseInt(swapQuote.network));
+      const dstAddress = await getTokenAddress(swapQuote.toToken, parseInt(swapQuote.network));
+      const decimals = await getTokenDecimals(swapQuote.fromToken, parseInt(swapQuote.network));
+      const amountWei = parseUnits(swapQuote.amount, await decimals);
 
       // Step 1: Handle token approval for ERC20 tokens (skip for ETH)
       if (swapQuote.fromToken.toUpperCase() !== 'ETH') {
@@ -502,14 +524,14 @@ export default function Terminal() {
       addLine(`📄 Order data prepared for signing`);
       
       // Check if token approval is needed (unless it's ETH)
-      if (srcAddress !== '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
+      if (await srcAddress !== '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
         addLine('🔍 Checking token allowance...');
         
         const allowanceResponse = await fetch(`/api/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${limitOrder.network}`);
         const allowanceData = await allowanceResponse.json();
         
         const decimals = getTokenDecimals(limitOrder.fromToken, parseInt(limitOrder.network));
-        const requiredAmount = parseFloat(limitOrder.amount) * Math.pow(10, decimals);
+        const requiredAmount = parseFloat(limitOrder.amount) * Math.pow(10, await decimals);
         
         if (parseFloat(allowanceData.allowance) < requiredAmount) {
           addLine('📝 Token approval required...');
@@ -519,7 +541,7 @@ export default function Terminal() {
           
           try {
             const approveTx = await writeContractAsync({
-              address: srcAddress as `0x${string}`,
+              address: await srcAddress as `0x${string}`,
               abi: erc20Abi,
               functionName: 'approve',
               args: [spenderData.address as `0x${string}`, BigInt(Math.floor(requiredAmount * 1.1))] // 10% buffer
@@ -624,7 +646,7 @@ export default function Terminal() {
         return;
       }
 
-      const toAmount = parseFloat(data.dstAmount) / Math.pow(10, getTokenDecimals(toToken, parseInt(network)));
+      const toAmount = parseFloat(data.dstAmount) / Math.pow(10, await getTokenDecimals(toToken, parseInt(network)));
       const estimatedGas = data.gas ? parseInt(data.gas).toLocaleString() : 'Unknown';
 
       addLine('📊 Quote received:');
@@ -662,6 +684,17 @@ export default function Terminal() {
 
   const closeChartModal = () => {
     setChartModal(prev => ({ ...prev, isOpen: false }));
+    // Reset tab name when chart is closed
+    if (tabId && onTabNameChange) {
+      onTabNameChange(tabId, 'defi');
+    }
+  };
+
+  const updateTabName = (operation: string, details?: string) => {
+    if (tabId && onTabNameChange) {
+      const name = details ? `${operation}-${details}` : operation;
+      onTabNameChange(tabId, name);
+    }
   };
 
   const processCommand = async (command: string) => {
@@ -684,7 +717,8 @@ export default function Terminal() {
       handleLimitOrder,
       parseSwapCommand,
       parseLimitOrderCommand,
-      openChartModal
+      openChartModal,
+      updateTabName
     };
 
     const commands = createCommands(commandContext);
@@ -709,8 +743,10 @@ export default function Terminal() {
       if (awaitingConfirmation && pendingSwap) {
         if (trimmed.toLowerCase() === 'yes' || trimmed.toLowerCase() === 'y') {
           await executeSwap(pendingSwap);
+          updateTabName('defi'); // Reset tab name after swap completion
         } else if (trimmed.toLowerCase() === 'no' || trimmed.toLowerCase() === 'n') {
           addLine('❌ Swap cancelled');
+          updateTabName('defi'); // Reset tab name after swap cancellation
           setPendingSwap(null);
           setAwaitingConfirmation(false);
         } else {
@@ -742,8 +778,10 @@ export default function Terminal() {
       else if (awaitingConfirmation && pendingLimitOrder) {
         if (trimmed.toLowerCase() === 'yes' || trimmed.toLowerCase() === 'y') {
           await executeLimitOrder(pendingLimitOrder);
+          updateTabName('defi'); // Reset tab name after limit order completion
         } else if (trimmed.toLowerCase() === 'no' || trimmed.toLowerCase() === 'n') {
           addLine('❌ Limit order cancelled');
+          updateTabName('defi'); // Reset tab name after limit order cancellation
           setPendingLimitOrder(null);
           setAwaitingConfirmation(false);
         } else {
@@ -805,29 +843,11 @@ export default function Terminal() {
   };
 
   return (
-    <div className="w-full h-screen bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
-      <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
-        <span className="text-gray-300 text-xs">
-          {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}@terminal` : 'defi-user@terminal'}
-        </span>
-        <div className="flex items-center space-x-3">
-          <div className="scale-75">
-            <ConnectButton />
-          </div>
-        </div>
-      </div>
-      
+    <div className="w-full h-full bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
       <div ref={terminalRef} className="flex-1 p-4 overflow-y-auto cursor-text" onClick={() => inputRef.current?.focus()}>
         {lines.map((line) => (
           <div key={line.id} className="flex items-start space-x-2 mb-1">
-            <span className="text-gray-500 text-xs min-w-[60px]">
-              {line.timestamp.toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-              })}
-            </span>
+            <Timestamp timestamp={line.timestamp} />
             <span className={`flex-1 ${
               line.type === 'command' ? 'text-white' :
               line.type === 'error' ? 'text-red-400' : 'text-gray-300'
@@ -839,14 +859,7 @@ export default function Terminal() {
         
         {!isProcessing ? (
           <div className="flex items-center space-x-2 mt-2">
-            <span className="text-gray-500 text-xs min-w-[60px]">
-              {new Date().toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-              })}
-            </span>
+            <CurrentTime />
             <span className="text-white">$</span>
             <input
               ref={inputRef}
@@ -861,21 +874,10 @@ export default function Terminal() {
           </div>
         ) : (
           <div className="flex items-center space-x-2 mt-2">
-            <span className="text-gray-500 text-xs min-w-[60px]">
-              {new Date().toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-              })}
-            </span>
+            <CurrentTime />
             <span className="text-yellow-400 animate-pulse">Processing...</span>
           </div>
         )}
-      </div>
-      
-      <div className="bg-gray-800 px-4 py-1 border-t border-gray-700 text-xs text-gray-400">
-        Tab: autocomplete • Ctrl+L: clear • ↑/↓: history
       </div>
 
       <ChartModal 
