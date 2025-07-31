@@ -9,6 +9,7 @@ interface TerminalTab {
   id: string;
   name: string;
   component: React.ReactNode;
+  windowsState?: any; // Store windows state per tab
 }
 
 export default function TabbedTerminal() {

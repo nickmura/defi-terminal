@@ -7,7 +7,7 @@ import { TOKENS, getTokenDecimals, resolveTokenInfo } from '../app/helper';
 import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { createCommands, COMMAND_LIST } from './commands';
-import ChartModal from './ChartModal';
+import ChartWindow from './ChartModal';
 
 interface TerminalLine {
   id: number;
@@ -39,6 +39,21 @@ interface TerminalProps {
   onTabNameChange?: (tabId: string, newName: string) => void;
 }
 
+interface ChartWindow {
+  id: string;
+  token0: string;
+  token1: string;
+  token0Symbol?: string;
+  token1Symbol?: string;
+  chainId: string;
+  chartType: 'candle' | 'line';
+  interval: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  zIndex: number;
+  isActive: boolean;
+}
+
 export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {}) {
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
@@ -63,21 +78,9 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
   const [pendingLimitOrder, setPendingLimitOrder] = useState<LimitOrderQuote | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [awaitingRateConfirmation, setAwaitingRateConfirmation] = useState(false);
-  const [chartModal, setChartModal] = useState<{
-    isOpen: boolean;
-    token0: string;
-    token1: string;
-    chainId: string;
-    chartType: 'candle' | 'line';
-    interval: string;
-  }>({
-    isOpen: false,
-    token0: '',
-    token1: '',
-    chainId: '',
-    chartType: 'candle',
-    interval: '1h'
-  });
+  const [chartWindows, setChartWindows] = useState<ChartWindow[]>([]);
+  const [nextWindowId, setNextWindowId] = useState(1);
+  const [activeWindowId, setActiveWindowId] = useState<string | null>(null);
   const lineIdCounterRef = useRef(2); // Start after initial lines
   const inputRef = useRef<HTMLInputElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -671,23 +674,48 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     }
   };
 
-  const openChartModal = (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval: string = '1h') => {
-    setChartModal({
-      isOpen: true,
+  const openChartModal = (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval: string = '1h', token0Symbol?: string, token1Symbol?: string) => {
+    const windowId = `chart-${nextWindowId}`;
+    const newWindow: ChartWindow = {
+      id: windowId,
       token0,
       token1,
+      token0Symbol,
+      token1Symbol,
       chainId,
       chartType,
-      interval
-    });
+      interval,
+      position: { x: 100 + (chartWindows.length * 30), y: 100 + (chartWindows.length * 30) },
+      size: { width: 800, height: 600 },
+      zIndex: 1000 + chartWindows.length,
+      isActive: true
+    };
+
+    setChartWindows(prev => [...prev.map(w => ({ ...w, isActive: false })), newWindow]);
+    setActiveWindowId(windowId);
+    setNextWindowId(prev => prev + 1);
   };
 
-  const closeChartModal = () => {
-    setChartModal(prev => ({ ...prev, isOpen: false }));
-    // Reset tab name when chart is closed
-    if (tabId && onTabNameChange) {
+  const closeChartWindow = (windowId: string) => {
+    setChartWindows(prev => prev.filter(w => w.id !== windowId));
+    if (activeWindowId === windowId) {
+      const remaining = chartWindows.filter(w => w.id !== windowId);
+      setActiveWindowId(remaining.length > 0 ? remaining[remaining.length - 1].id : null);
+    }
+    
+    // Reset tab name when all charts are closed
+    if (chartWindows.length <= 1 && tabId && onTabNameChange) {
       onTabNameChange(tabId, 'defi');
     }
+  };
+
+  const focusWindow = (windowId: string) => {
+    setChartWindows(prev => prev.map(w => ({ 
+      ...w, 
+      isActive: w.id === windowId,
+      zIndex: w.id === windowId ? Math.max(...prev.map(win => win.zIndex)) + 1 : w.zIndex
+    })));
+    setActiveWindowId(windowId);
   };
 
   const updateTabName = (operation: string, details?: string) => {
@@ -880,15 +908,26 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         )}
       </div>
 
-      <ChartModal 
-        isOpen={chartModal.isOpen}
-        onClose={closeChartModal}
-        token0={chartModal.token0}
-        token1={chartModal.token1}
-        chainId={chartModal.chainId}
-        chartType={chartModal.chartType}
-        interval={chartModal.interval}
-      />
+      {/* Chart Windows */}
+      {chartWindows.map((window) => (
+        <ChartWindow
+          key={window.id}
+          id={window.id}
+          token0={window.token0}
+          token1={window.token1}
+          token0Symbol={window.token0Symbol}
+          token1Symbol={window.token1Symbol}
+          chainId={window.chainId}
+          chartType={window.chartType}
+          interval={window.interval}
+          onClose={() => closeChartWindow(window.id)}
+          onFocus={() => focusWindow(window.id)}
+          zIndex={window.zIndex}
+          isActive={window.isActive}
+          position={window.position}
+          size={window.size}
+        />
+      ))}
     </div>
   );
 }

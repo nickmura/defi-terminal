@@ -2,27 +2,50 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+import Window from './Window';
 
-interface ChartModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface ChartWindowProps {
+  id: string;
   token0: string;
   token1: string;
+  token0Symbol?: string;
+  token1Symbol?: string;
   chainId: string;
   chartType: 'candle' | 'line';
   interval?: string;
+  onClose: () => void;
+  onFocus?: () => void;
+  zIndex?: number;
+  isActive?: boolean;
+  position?: { x: number; y: number };
+  size?: { width: number; height: number };
 }
 
 
-export default function ChartModal({ isOpen, onClose, token0, token1, chainId, chartType, interval = '1h' }: ChartModalProps) {
+export default function ChartWindow({ 
+  id, 
+  token0, 
+  token1, 
+  token0Symbol,
+  token1Symbol,
+  chainId, 
+  chartType, 
+  interval = '1h', 
+  onClose, 
+  onFocus, 
+  zIndex = 1000, 
+  isActive = true,
+  position = { x: 100, y: 100 },
+  size = { width: 800, height: 600 }
+}: ChartWindowProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
 
-  // Initialize chart when modal opens
+  // Initialize chart when component mounts
   useEffect(() => {
-    if (isOpen && chartContainerRef.current) {
+    if (chartContainerRef.current) {
       // Clean up existing chart if it exists
       if (chartRef.current) {
         chartRef.current.remove();
@@ -66,23 +89,41 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
       });
 
       chartRef.current = chart;
+      
+      // Initial data fetch
+      if (token0 && token1) {
+        fetchChartData();
+      }
     }
-  }, [isOpen]);
+  }, []);
 
-  // Fetch and update chart data
+  // Handle chart resizing when window size changes
   useEffect(() => {
-    if (isOpen && token0 && token1 && chartRef.current) {
+    if (!chartRef.current || !chartContainerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (entries.length === 0 || !chartRef.current) return;
+      
+      const { width, height } = entries[0].contentRect;
+      chartRef.current.applyOptions({
+        width: Math.floor(width),
+        height: Math.floor(height)
+      });
+    });
+
+    resizeObserver.observe(chartContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Fetch and update chart data when parameters change
+  useEffect(() => {
+    if (token0 && token1 && chartRef.current) {
       fetchChartData();
     }
-  }, [isOpen, token0, token1, chainId, chartType, interval]);
-
-  // Cleanup chart when modal closes or component unmounts
-  useEffect(() => {
-    if (!isOpen && chartRef.current) {
-      chartRef.current.remove();
-      chartRef.current = null;
-    }
-  }, [isOpen]);
+  }, [token0, token1, chainId, chartType, interval]);
 
   // Cleanup chart on unmount
   useEffect(() => {
@@ -310,56 +351,62 @@ export default function ChartModal({ isOpen, onClose, token0, token1, chainId, c
   };
 
 
-  if (!isOpen) return null;
+  // Use symbols if available, otherwise fall back to addresses
+  const displayToken0 = token0Symbol || token0;
+  const displayToken1 = token1Symbol || token1;
+  const windowTitle = `📈 ${displayToken0.toUpperCase()}/${displayToken1.toUpperCase()} - ${chartType === 'candle' ? 'Candlestick' : 'Line'} Chart`;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-600 rounded-lg shadow-2xl max-w-4xl w-full mx-4 h-3/4 flex flex-col">
-        {/* Unix-style Header */}
-        <div className="bg-gray-800 border-b border-gray-600 px-4 py-2 flex items-center justify-between rounded-t-lg">
-          <div className="flex items-center space-x-2">
-            <div className="text-green-400 font-mono text-sm">
-              📈 {token0.toUpperCase()}/{token1.toUpperCase()} - {chartType === 'candle' ? 'Candlestick' : 'Line'} Chart
-            </div>
+    <Window
+      id={id}
+      title={windowTitle}
+      onClose={onClose}
+      onFocus={onFocus}
+      zIndex={zIndex}
+      isActive={isActive}
+      initialPosition={position}
+      initialSize={size}
+      minSize={{ width: 600, height: 400 }}
+    >
+      {/* Chart Content */}
+      <div className="flex-1 bg-black text-green-400 font-mono relative h-full flex flex-col">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
+            <div className="text-green-400">Loading chart data...</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-red-400 font-bold text-lg w-6 h-6 flex items-center justify-center border border-gray-600 hover:border-red-400 transition-colors"
-            title="Close"
-          >
-            ×
-          </button>
-        </div>
+        )}
 
-        {/* Chart Content */}
-        <div className="flex-1 p-4 bg-black text-green-400 font-mono relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
-              <div className="text-green-400">Loading chart data...</div>
-            </div>
-          )}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
+            <div className="text-red-400">Error: {error}</div>
+          </div>
+        )}
 
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
-              <div className="text-red-400">Error: {error}</div>
-            </div>
-          )}
-
-          {/* Chart Container */}
+        {/* Chart Container */}
+        <div className="flex-1 p-4 pb-0">
           <div 
             ref={chartContainerRef}
             className="w-full h-full"
-            style={{ minHeight: '400px' }}
+            style={{ minHeight: '300px' }}
           />
         </div>
-
+        
         {/* Status Bar */}
-        <div className="bg-gray-800 border-t border-gray-600 px-4 py-2 text-xs text-gray-400 rounded-b-lg">
+        <div className="bg-gray-800 border-t border-gray-600 px-4 py-2 text-xs text-gray-400 flex-shrink-0">
           Network: {chainId === '1' ? 'Ethereum' : chainId === '10' ? 'Optimism' : 'Arbitrum'} | 
           Chart Type: {chartType === 'candle' ? 'Candlestick' : 'Line'} | 
-          Last updated: {new Date().toLocaleTimeString()}
+          Last updated: {new Date().toLocaleTimeString()} | 
+          Chart visuals powered by{' '}
+          <a 
+            href="https://www.tradingview.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            TradingView
+          </a>
         </div>
       </div>
-    </div>
+    </Window>
   );
 }

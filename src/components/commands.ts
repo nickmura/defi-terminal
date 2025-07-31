@@ -401,7 +401,7 @@ export const createCommands = (ctx: CommandContext) => {
       updateTabName?.('chart', `${token0Symbol.toLowerCase()}`);
       
       if (openChartModal) {
-        openChartModal(token0Address, token1Address, network, chartType, interval);
+        openChartModal(token0Address, token1Address, network, chartType, interval, token0Symbol, token1Symbol);
       } else {
         addLine('❌ Chart functionality not available', 'error');
       }
