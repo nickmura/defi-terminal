@@ -52,7 +52,8 @@ export const createCommands = (ctx: CommandContext) => {
       'curl <url> - HTTP request', 
       'sleep <ms> - Wait',
       'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
-      'trace <txHash> <blockNumber> [--network <chain>] - Get transaction execution trace', 
+      'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace', 
+      'networkinfo [chain] - Get network information and statistics',
       'wallet - Show wallet info', 
       'balance - Show ETH balance', 
       'message <text> - Sign message (requires wallet)', 
@@ -560,7 +561,7 @@ export const createCommands = (ctx: CommandContext) => {
       }
 
       const txHash = args[0];
-      let blockNumber = args[1];
+      let blockNumber: string | undefined = args[1];
       let network = chainId.toString();
 
       // Find --network flag
@@ -713,6 +714,115 @@ export const createCommands = (ctx: CommandContext) => {
       } catch (error) {
         addLine(`❌ Failed to get transaction trace: ${error}`, 'error');
       }
+    },
+
+    networkinfo: async (args: string[]) => {
+      let network = chainId.toString();
+
+      // If a chain is provided as argument
+      if (args.length > 0) {
+        const chainInput = args[0].toLowerCase();
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'avalanche': '43114',
+          'zksync': '324'
+        };
+        network = networkMap[chainInput] || chainInput;
+      }
+      
+      addLine(`🌐 Getting network information for chain ${network}...`);
+      
+      try {
+        const response = await fetch(`/api/tokens/details?chain=${network}`);
+
+        if (!response.ok) {
+          const error = await response.json();
+          addLine(`❌ Failed to get network details: ${error.error}`, 'error');
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (data.assets) {
+          const assets = data.assets;
+          addLine(`✅ Network Information:`);
+          addLine('');
+          addLine(`🏷️  ${assets.name} (${assets.symbol})`);
+          addLine(`   Chain ID: ${network}`);
+          addLine(`   Type: ${assets.type}`);
+          addLine(`   Status: ${assets.status}`);
+          addLine(`   Decimals: ${assets.decimals}`);
+          if (assets.coin_type) {
+            addLine(`   Coin Type: ${assets.coin_type}`);
+          }
+          addLine('');
+          
+          if (assets.description) {
+            addLine(`📝 Description:`);
+            addLine(`   ${assets.description}`);
+            addLine('');
+          }
+          
+          addLine(`🔗 Resources:`);
+          if (assets.website) {
+            addLine(`   Website: ${assets.website}`);
+          }
+          if (assets.explorer) {
+            addLine(`   Explorer: ${assets.explorer}`);
+          }
+          if (assets.rpc_url) {
+            addLine(`   RPC URL: ${assets.rpc_url}`);
+          }
+          if (assets.research) {
+            addLine(`   Research: ${assets.research}`);
+          }
+          
+          if (assets.links && assets.links.length > 0) {
+            addLine(`   Links:`);
+            assets.links.forEach((link: any) => {
+              addLine(`     ${link.name}: ${link.url}`);
+            });
+          }
+          
+          if (assets.tags && assets.tags.length > 0) {
+            addLine(`   Tags: ${assets.tags.join(', ')}`);
+          }
+          addLine('');
+        }
+        
+        if (data.details) {
+          const details = data.details;
+          addLine(`📊 Market Data:`);
+          if (details.marketCap) {
+            addLine(`   Market Cap: $${details.marketCap.toLocaleString()}`);
+          }
+          if (details.circulatingSupply) {
+            addLine(`   Circulating Supply: ${details.circulatingSupply.toLocaleString()}`);
+          }
+          if (details.totalSupply) {
+            addLine(`   Total Supply: ${details.totalSupply.toLocaleString()}`);
+          }
+          if (details.vol24) {
+            addLine(`   24h Volume: $${details.vol24.toLocaleString()}`);
+          }
+          if (details.provider) {
+            addLine(`   Data Provider: ${details.provider}`);
+            if (details.providerURL) {
+              addLine(`   Provider URL: ${details.providerURL}`);
+            }
+          }
+        }
+
+      } catch (error) {
+        addLine(`❌ Failed to get network information: ${error}`, 'error');
+      }
     }
   };
 };
@@ -721,5 +831,5 @@ export const createCommands = (ctx: CommandContext) => {
 export const COMMAND_LIST = [
   'help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 
   'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 
-  'price', 'chart', 'swap', 'rpc', 'trace'
+  'price', 'chart', 'swap', 'rpc', 'trace', 'networkinfo'
 ];
