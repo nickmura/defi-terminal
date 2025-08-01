@@ -548,18 +548,19 @@ export const createCommands = (ctx: CommandContext) => {
     },
 
     trace: async (args: string[]) => {
-      if (args.length < 2) {
-        addLine('Usage: trace <txHash> <blockNumber> [--network <chain>]', 'error');
+      if (args.length < 1) {
+        addLine('Usage: trace <txHash> [blockNumber] [--network <chain>]', 'error');
         addLine('');
         addLine('Examples:');
+        addLine('  trace 0x16897e492b2e023d8f07be9e925f2c15a91000ef11a01fc71e70f75050f1e03c');
         addLine('  trace 0x16897e492b2e023d8f07be9e925f2c15a91000ef11a01fc71e70f75050f1e03c 18500000');
-        addLine('  trace 0x123... 0x11A5B20 --network ethereum');
+        addLine('  trace 0x123... --network ethereum');
         addLine('  trace 0x456... 42000000 --network polygon');
         return;
       }
 
       const txHash = args[0];
-      const blockNumber = args[1];
+      let blockNumber = args[1];
       let network = chainId.toString();
 
       // Find --network flag
@@ -578,6 +579,57 @@ export const createCommands = (ctx: CommandContext) => {
           'avalanche': '43114'
         };
         network = networkMap[networkName] || networkName;
+      }
+
+      // Check if blockNumber looks like --network flag (meaning no block number provided)
+      if (blockNumber && blockNumber.startsWith('--')) {
+        blockNumber = undefined;
+      }
+
+      // If no block number provided, fetch it from the transaction
+      if (!blockNumber) {
+        addLine(`🔍 Fetching transaction details...`);
+        try {
+          const rpcResponse = await fetch(`/api/eth_rpc?chainId=${network}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getTransactionByHash',
+              params: [txHash],
+              id: Date.now()
+            })
+          });
+
+          if (!rpcResponse.ok) {
+            const error = await rpcResponse.json();
+            addLine(`❌ RPC Error: ${error.error?.message || 'Failed to fetch transaction'}`, 'error');
+            return;
+          }
+
+          const rpcData = await rpcResponse.json();
+          
+          if (!rpcData.result) {
+            addLine(`❌ Transaction not found: ${txHash}`, 'error');
+            return;
+          }
+
+          // Extract block number from the transaction
+          blockNumber = rpcData.result.blockNumber;
+          if (blockNumber) {
+            // Convert from hex to decimal
+            blockNumber = parseInt(blockNumber, 16).toString();
+            addLine(`✅ Found block number: ${blockNumber}`);
+          } else {
+            addLine(`❌ Transaction is pending or block number not available`, 'error');
+            return;
+          }
+        } catch (error) {
+          addLine(`❌ Failed to fetch transaction: ${error}`, 'error');
+          return;
+        }
       }
 
       addLine(`🔍 Getting transaction trace...`);
