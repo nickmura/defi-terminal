@@ -1,4 +1,4 @@
-import { TOKENS, resolveTokenAddress } from '../app/helper';
+import { resolveTokenAddress } from '../app/helper';
 
 // Types for command context
 export interface CommandContext {
@@ -11,8 +11,6 @@ export interface CommandContext {
   commandHistory: string[];
   setCommandHistory: (history: string[]) => void;
   signMessageAsync: (params: { message: string }) => Promise<string>;
-  writeContractAsync: (params: any) => Promise<string>;
-  signTypedDataAsync: (params: any) => Promise<string>;
   handleClassicSwap: (amount: string, fromToken: string, toToken: string, network: string, slippage: string) => Promise<void>;
   handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => Promise<void>;
   parseSwapCommand: (args: string[]) => any;
@@ -32,8 +30,6 @@ export const createCommands = (ctx: CommandContext) => {
     commandHistory, 
     setCommandHistory,
     signMessageAsync,
-    writeContractAsync,
-    signTypedDataAsync,
     handleClassicSwap,
     handleLimitOrder,
     parseSwapCommand,
@@ -55,7 +51,8 @@ export const createCommands = (ctx: CommandContext) => {
       'history clear - Clear command history', 
       'curl <url> - HTTP request', 
       'sleep <ms> - Wait',
-      'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls', 
+      'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
+      'trace <txHash> <blockNumber> [--network <chain>] - Get transaction execution trace', 
       'wallet - Show wallet info', 
       'balance - Show ETH balance', 
       'message <text> - Sign message (requires wallet)', 
@@ -417,7 +414,7 @@ export const createCommands = (ctx: CommandContext) => {
       updateTabName?.('chart', `${token0Symbol.toLowerCase()}`);
       
       if (openChartModal) {
-        openChartModal(token0Address, token1Address, network, chartType, interval, token0Symbol, token1Symbol);
+        openChartModal(token0Address, token1Address, network, chartType, interval);
       } else {
         addLine('❌ Chart functionality not available', 'error');
       }
@@ -548,6 +545,122 @@ export const createCommands = (ctx: CommandContext) => {
       } catch (error) {
         addLine(`❌ Failed to execute RPC: ${error}`, 'error');
       }
+    },
+
+    trace: async (args: string[]) => {
+      if (args.length < 2) {
+        addLine('Usage: trace <txHash> <blockNumber> [--network <chain>]', 'error');
+        addLine('');
+        addLine('Examples:');
+        addLine('  trace 0x16897e492b2e023d8f07be9e925f2c15a91000ef11a01fc71e70f75050f1e03c 18500000');
+        addLine('  trace 0x123... 0x11A5B20 --network ethereum');
+        addLine('  trace 0x456... 42000000 --network polygon');
+        return;
+      }
+
+      const txHash = args[0];
+      const blockNumber = args[1];
+      let network = chainId.toString();
+
+      // Find --network flag
+      const networkIndex = args.findIndex(arg => arg === '--network');
+      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+        const networkName = args[networkIndex + 1].toLowerCase();
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'avalanche': '43114'
+        };
+        network = networkMap[networkName] || networkName;
+      }
+
+      addLine(`🔍 Getting transaction trace...`);
+      addLine(`📊 TX: ${txHash.slice(0, 10)}...${txHash.slice(-8)}`);
+      addLine(`📦 Block: ${blockNumber} on chain ${network}`);
+      
+      try {
+        const response = await fetch(`/api/traces?chain=${network}&blockNumber=${blockNumber}&txHash=${txHash}`);
+
+        if (!response.ok) {
+          const error = await response.json();
+          addLine(`❌ Trace Error: ${error.error}`, 'error');
+          return;
+        }
+
+        const data = await response.json();
+        const trace = data.transactionTrace;
+        const summary = data.summary;
+        
+        addLine('✅ Transaction Trace Retrieved:');
+        addLine('');
+        
+        // Basic transaction info
+        addLine('📋 Transaction Summary:');
+        addLine(`  Status: ${summary.status}`);
+        addLine(`  Type: ${summary.type}`);
+        addLine(`  From: ${summary.from}`);
+        addLine(`  To: ${summary.to}`);
+        addLine(`  Value: ${summary.value} wei`);
+        addLine('');
+        
+        // Gas information
+        addLine('⛽ Gas Information:');
+        if (summary.gasUsed !== undefined && summary.gasUsed !== null) {
+          addLine(`  Gas Used: ${summary.gasUsed.toLocaleString()}`);
+        }
+        if (summary.gasLimit !== undefined && summary.gasLimit !== null) {
+          addLine(`  Gas Limit: ${summary.gasLimit.toLocaleString()}`);
+        }
+        if (summary.gasPrice) {
+          addLine(`  Gas Price: ${summary.gasPrice.toLocaleString()} gwei`);
+        }
+        addLine('');
+        
+        // Execution details
+        addLine('🔧 Execution Details:');
+        addLine(`  Logs: ${summary.logCount}`);
+        addLine(`  Internal Calls: ${summary.callCount}`);
+        
+        if (trace.input && trace.input !== '0x') {
+          addLine(`  Input Data: ${trace.input.slice(0, 42)}...`);
+        }
+        
+        // Show logs if any
+        if (trace.logs && trace.logs.length > 0) {
+          addLine('');
+          addLine('📝 Event Logs:');
+          trace.logs.forEach((log: any, index: number) => {
+            addLine(`  Log ${index + 1}:`);
+            addLine(`    Contract: ${log.contract}`);
+            addLine(`    Topics: ${log.topics.length}`);
+            if (log.data && log.data !== '0x') {
+              addLine(`    Data: ${log.data.slice(0, 42)}...`);
+            }
+          });
+        }
+        
+        // Show internal calls if any
+        if (trace.calls && trace.calls.length > 0) {
+          addLine('');
+          addLine('🔄 Internal Calls:');
+          addLine(`  Found ${trace.calls.length} internal call(s)`);
+          trace.calls.slice(0, 3).forEach((call: any, index: number) => {
+            addLine(`  Call ${index + 1}: ${call.type} to ${call.to}`);
+          });
+          if (trace.calls.length > 3) {
+            addLine(`  ... and ${trace.calls.length - 3} more calls`);
+          }
+        }
+
+      } catch (error) {
+        addLine(`❌ Failed to get transaction trace: ${error}`, 'error');
+      }
     }
   };
 };
@@ -556,5 +669,5 @@ export const createCommands = (ctx: CommandContext) => {
 export const COMMAND_LIST = [
   'help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 
   'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 
-  'price', 'chart', 'swap', 'rpc'
+  'price', 'chart', 'swap', 'rpc', 'trace'
 ];
