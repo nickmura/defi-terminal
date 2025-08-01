@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 import Terminal from './Terminal';
+import { useDomainName } from '../hooks/useDomainName';
 
 interface TerminalTab {
   id: string;
@@ -14,6 +15,7 @@ interface TerminalTab {
 
 export default function TabbedTerminal() {
   const { address, isConnected } = useAccount();
+  const { domain, hasDomain, isLoading } = useDomainName(address);
   const [activeTab, setActiveTab] = useState('1');
   const [tabCounter, setTabCounter] = useState(1);
 
@@ -110,7 +112,12 @@ export default function TabbedTerminal() {
       {/* Main Header/Navbar */}
       <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
         <span className="text-gray-300 text-xs">
-          {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}@terminal` : 'defi-user@terminal'}
+          {isConnected ? (
+            hasDomain && typeof domain === 'string' ? `${domain}@terminal` : `${address?.slice(0, 6)}...${address?.slice(-4)}@terminal`
+          ) : 'defi-user@terminal'}
+          {isLoading && isConnected && (
+            <span className="ml-1 text-yellow-400">...</span>
+          )}
         </span>
         <div className="flex items-center space-x-3">
           <div className="scale-75">
