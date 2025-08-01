@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ONEINCH_API_BASE = 'https://api.1inch.dev/token';
+const ONEINCH_API_BASE = 'https://api.1inch.dev/token-details';
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('1inch network details API error:', response.status, errorText);
+      console.error('Full URL:', url);
       
       if (response.status === 404) {
         return NextResponse.json(
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { error: `Network details lookup failed: ${response.status}` },
+        { error: `Network details lookup failed: ${response.status}`, details: errorText },
         { status: response.status }
       );
     }

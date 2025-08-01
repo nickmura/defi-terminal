@@ -745,6 +745,9 @@ export const createCommands = (ctx: CommandContext) => {
         if (!response.ok) {
           const error = await response.json();
           addLine(`❌ Failed to get network details: ${error.error}`, 'error');
+          if (error.details) {
+            addLine(`Details: ${error.details}`, 'error');
+          }
           return;
         }
 
@@ -801,16 +804,16 @@ export const createCommands = (ctx: CommandContext) => {
           const details = data.details;
           addLine(`📊 Market Data:`);
           if (details.marketCap) {
-            addLine(`   Market Cap: $${details.marketCap.toLocaleString()}`);
+            addLine(`   Market Cap: $${Math.round(details.marketCap).toLocaleString()}`);
           }
           if (details.circulatingSupply) {
-            addLine(`   Circulating Supply: ${details.circulatingSupply.toLocaleString()}`);
+            addLine(`   Circulating Supply: ${Math.round(details.circulatingSupply).toLocaleString()}`);
           }
           if (details.totalSupply) {
-            addLine(`   Total Supply: ${details.totalSupply.toLocaleString()}`);
+            addLine(`   Total Supply: ${Math.round(details.totalSupply).toLocaleString()}`);
           }
           if (details.vol24) {
-            addLine(`   24h Volume: $${details.vol24.toLocaleString()}`);
+            addLine(`   24h Volume: $${Math.round(details.vol24).toLocaleString()}`);
           }
           if (details.provider) {
             addLine(`   Data Provider: ${details.provider}`);

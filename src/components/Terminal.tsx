@@ -725,6 +725,29 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     }
   };
 
+  const renderContentWithLinks = (content: string) => {
+    // URL regex pattern to match http/https URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white hover:text-gray-300 underline"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
     
@@ -889,7 +912,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
               line.type === 'command' ? 'text-white' :
               line.type === 'error' ? 'text-red-400' : 'text-gray-300'
             }`}>
-              {line.content}
+              {renderContentWithLinks(line.content)}
             </span>
           </div>
         ))}
