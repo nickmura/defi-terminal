@@ -42,15 +42,10 @@ export const createCommands = (ctx: CommandContext) => {
     help: () => [
       'help - Show commands', 
       'clear - Clear terminal', 
-      'echo <text> - Echo text', 
       'date - Show date', 
       'whoami - Show user', 
-      'pwd - Show directory', 
-      'ls - List files', 
       'history - Command history', 
-      'history clear - Clear command history', 
-      'curl <url> - HTTP request', 
-      'sleep <ms> - Wait',
+      'history clear - Clear command history',
       'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
       'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace', 
       'networkinfo [chain] - Get network information and statistics',
@@ -67,15 +62,9 @@ export const createCommands = (ctx: CommandContext) => {
 
     clear: () => setLines([]),
 
-    echo: (args: string[]) => addLine(args.join(' ')),
-
     date: () => addLine(new Date().toString()),
 
     whoami: () => addLine(isConnected ? address?.slice(0, 6) + '...' + address?.slice(-4) : 'defi-user'),
-
-    pwd: () => addLine('/home/defi-user/terminal'),
-
-    ls: () => ['contracts/', 'scripts/', 'config.json', 'README.md'].forEach(cmd => addLine(cmd)),
 
     history: (args: string[]) => {
       if (args[0] === 'clear') {
@@ -189,19 +178,6 @@ export const createCommands = (ctx: CommandContext) => {
         addLine('  swap classic - Immediate swap with slippage protection', 'error');
         addLine('  swap limit - Create limit order at specific rate', 'error');
         return;
-      }
-    },
-
-    curl: async (args: string[]) => {
-      if (!args[0]) return addLine('Usage: curl <url>', 'error');
-      try {
-        addLine(`Fetching ${args[0]}...`);
-        const res = await fetch(args[0]);
-        addLine(`Status: ${res.status}`);
-        const text = await res.text();
-        addLine(text.slice(0, 500) + (text.length > 500 ? '...' : ''));
-      } catch { 
-        addLine(`Failed to fetch ${args[0]}`, 'error'); 
       }
     },
 
@@ -419,13 +395,6 @@ export const createCommands = (ctx: CommandContext) => {
       } else {
         addLine('❌ Chart functionality not available', 'error');
       }
-    },
-
-    sleep: async (args: string[]) => {
-      const ms = parseInt(args[0]) || 1000;
-      addLine(`Sleeping for ${ms}ms...`);
-      await new Promise(resolve => setTimeout(resolve, ms));
-      addLine('Done!');
     },
 
     rpc: async (args: string[]) => {
@@ -832,7 +801,6 @@ export const createCommands = (ctx: CommandContext) => {
 
 // Command registry with all available commands
 export const COMMAND_LIST = [
-  'help', 'clear', 'echo', 'date', 'whoami', 'pwd', 'ls', 
-  'history', 'curl', 'sleep', 'wallet', 'balance', 'message', 
+  'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'message', 
   'price', 'chart', 'swap', 'rpc', 'trace', 'networkinfo'
 ];
