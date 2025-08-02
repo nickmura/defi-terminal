@@ -8,6 +8,7 @@ import { parseUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { createCommands, COMMAND_LIST } from './commands';
 import ChartWindow from './ChartModal';
+import { useDomainName } from '../hooks/useDomainName';
 
 interface TerminalLine {
   id: number;
@@ -58,6 +59,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
   const { address, isConnected } = useAccount();
   const { data: balance } = useBalance({ address });
   const { signMessageAsync } = useSignMessage();
+  const { domain, hasDomain } = useDomainName(address);
   const { signTypedDataAsync } = useSignTypedData();
   const chainId = useChainId();
   const { sendTransactionAsync } = useSendTransaction();
@@ -65,7 +67,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
   const { switchChainAsync } = useSwitchChain();
   
   const [lines, setLines] = useState<TerminalLine[]>([
-    { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v1.0.0', timestamp: new Date() },
+    { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v0.1.0, powered by 1inch', timestamp: new Date() },
     { id: 1, type: 'output', content: 'Type "help" for available commands.', timestamp: new Date() }
   ]);
   const [currentCommand, setCurrentCommand] = useState('');
@@ -769,7 +771,9 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       parseSwapCommand,
       parseLimitOrderCommand,
       openChartModal,
-      updateTabName
+      updateTabName,
+      domain,
+      hasDomain
     };
 
     const commands = createCommands(commandContext);

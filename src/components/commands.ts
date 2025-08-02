@@ -17,6 +17,8 @@ export interface CommandContext {
   parseLimitOrderCommand: (args: string[]) => any;
   openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string) => void;
   updateTabName?: (operation: string, details?: string) => void;
+  domain: string | null;
+  hasDomain: boolean;
 }
 
 export const createCommands = (ctx: CommandContext) => {
@@ -35,7 +37,9 @@ export const createCommands = (ctx: CommandContext) => {
     parseSwapCommand,
     parseLimitOrderCommand,
     openChartModal,
-    updateTabName
+    updateTabName,
+    domain,
+    hasDomain
   } = ctx;
 
   return {
@@ -64,7 +68,16 @@ export const createCommands = (ctx: CommandContext) => {
 
     date: () => addLine(new Date().toString()),
 
-    whoami: () => addLine(isConnected ? address?.slice(0, 6) + '...' + address?.slice(-4) : 'defi-user'),
+    whoami: () => {
+      if (!isConnected) {
+        addLine('defi-user');
+      } else {
+        const displayText = hasDomain && domain 
+          ? `${domain} (${address})` 
+          : address || 'Unknown address';
+        addLine(displayText);
+      }
+    },
 
     history: (args: string[]) => {
       if (args[0] === 'clear') {
