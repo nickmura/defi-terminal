@@ -55,7 +55,8 @@ export const createCommands = (ctx: CommandContext) => {
       'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
       'networkinfo [chain] - Get network information and statistics',
       'wallet - Show wallet info', 
-      'balance - Show ETH balance', 
+      'balance - Show all token balances using 1inch API',
+      'nft_balance [address] - Show NFT holdings across all chains (defaults to connected wallet)', 
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
       'chart <token0> [token1] [--type candle|line] [--interval <time>] [--network <name>] - Show price chart (defaults to /USDC)',
@@ -103,29 +104,90 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
-    balance: () => {
+    balance: async () => {
       if (!isConnected) {
         addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
-      } else if (balance) {
-        const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
-        const getNetworkName = (chainId: number) => {
-          const names: { [key: number]: string } = {
-            1: 'Ethereum',
-            137: 'Polygon',
-            10: 'Optimism',
-            42161: 'Arbitrum',
-            8453: 'Base',
-            56: 'BSC',
-            43114: 'Avalanche'
-          };
-          return names[chainId] || `Chain ${chainId}`;
+        return;
+      }
+
+      if (!address) {
+        addLine('Wallet address not available', 'error');
+        return;
+      }
+
+      const getNetworkName = (chainId: number) => {
+        const names: { [key: number]: string } = {
+          1: 'Ethereum',
+          137: 'Polygon', 
+          10: 'Optimism',
+          42161: 'Arbitrum',
+          8453: 'Base',
+          56: 'BSC',
+          43114: 'Avalanche'
         };
+        return names[chainId] || `Chain ${chainId}`;
+      };
+
+      addLine(`🔍 Fetching token balances...`);
+      addLine(`🌐 Network: ${getNetworkName(chainId)}`);
+      addLine(`💳 Address: ${address?.slice(0, 6)}...${address?.slice(-4)}`);
+      addLine('');
+
+      try {
+        const response = await fetch(`/api/tokens/balances?walletAddress=${address}&chainId=${chainId}`);
         
-        addLine(`💰 ${formattedBalance} ${balance.symbol}`);
-        addLine(`🌐 Network: ${getNetworkName(chainId)}`);
-        addLine(`💳 Address: ${address?.slice(0, 6)}...${address?.slice(-4)}`);
-      } else {
-        addLine('Balance not available');
+        if (!response.ok) {
+          const error = await response.json();
+          addLine(`❌ Failed to fetch balances: ${error.error}`, 'error');
+          
+          // Fallback to just ETH balance from wagmi
+          if (balance) {
+            const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
+            addLine('');
+            addLine('📊 Fallback ETH Balance:');
+            addLine(`💰 ${formattedBalance} ${balance.symbol}`);
+          }
+          return;
+        }
+
+        const data = await response.json();
+        console.log(data)
+        if (data.totalTokens === 0) {
+          addLine('⚠️  No token balances found');
+          return;
+        }
+
+        addLine(`✅ Found ${data.totalTokens} tokens with balances:`);
+        addLine('');
+
+        // Show up to 10 tokens with largest balances
+        const topBalances = data.balances.slice(0, 10);
+        
+        for (const token of topBalances) {
+          // Skip tokens with zero balance
+          if (parseFloat(token.formattedBalance) > 0) {
+            addLine(`💰 ${token.displayBalance} ${token.symbol}`);
+            if (token.name && token.name !== token.symbol) {
+              addLine(`   ${token.name}`);
+            }
+          }
+        }
+
+        if (data.totalTokens > 10) {
+          addLine('');
+          addLine(`... and ${data.totalTokens - 10} more tokens`);
+        }
+
+      } catch (error) {
+        addLine(`❌ Error fetching balances: ${error}`, 'error');
+        
+        // Fallback to ETH balance from wagmi
+        if (balance) {
+          const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
+          addLine('');
+          addLine('📊 Fallback ETH Balance:');
+          addLine(`💰 ${formattedBalance} ${balance.symbol}`);
+        }
       }
     },
 
@@ -923,12 +985,98 @@ export const createCommands = (ctx: CommandContext) => {
       } catch (error) {
         addLine(`❌ Failed to get network information: ${error}`, 'error');
       }
+    },
+
+    nft_balance: async (args: string[]) => {
+      const targetAddress = args[0] || address;
+      
+      if (!targetAddress) {
+        addLine('❌ No address provided and no wallet connected', 'error');
+        return;
+      }
+
+      const supportedChains = ['1', '137', '10', '42161', '8453', '56', '43114'];
+      
+      addLine(`🖼️  Fetching NFT holdings for ${targetAddress.slice(0, 6)}...${targetAddress.slice(-4)}`);
+      addLine(`🌐 Checking chains: Ethereum, Polygon, Optimism, Arbitrum, Base, BSC, Avalanche`);
+      addLine('');
+      
+      try {
+        const chainParams = supportedChains.map(id => `chainId=${id}`).join('&');
+        const response = await fetch(`/api/nft/byaddress?address=${targetAddress}&${chainParams}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data || typeof data !== 'object') {
+          addLine('❌ Invalid response from NFT API', 'error');
+          return;
+        }
+
+        const chainNames: { [key: string]: string } = {
+          '1': 'Ethereum',
+          '137': 'Polygon',
+          '10': 'Optimism', 
+          '42161': 'Arbitrum',
+          '8453': 'Base',
+          '56': 'BSC',
+          '43114': 'Avalanche'
+        };
+
+        if (!data.assets || !Array.isArray(data.assets)) {
+          addLine('📭 No NFTs found or invalid response format');
+          return;
+        }
+
+        const totalNFTs = data.assets.length;
+        
+        if (totalNFTs === 0) {
+          addLine('📭 No NFTs found across all supported chains');
+          return;
+        }
+
+        // Group NFTs by chain
+        const nftsByChain: { [key: string]: any[] } = {};
+        data.assets.forEach((nft: any) => {
+          const chainId = nft.chainId?.toString();
+          if (chainId) {
+            if (!nftsByChain[chainId]) {
+              nftsByChain[chainId] = [];
+            }
+            nftsByChain[chainId].push(nft);
+          }
+        });
+
+        // Display NFTs by chain
+        Object.keys(nftsByChain).forEach(chainId => {
+          const chainNFTs = nftsByChain[chainId];
+          const chainName = chainNames[chainId] || `Chain ${chainId}`;
+          
+          addLine(`📱 ${chainName}: ${chainNFTs.length} NFT${chainNFTs.length > 1 ? 's' : ''}`);
+          
+          // Show all NFTs
+          chainNFTs.forEach((nft: any) => {
+            const name = nft.name || nft.collection_name || 'Unknown';
+            const tokenId = nft.token_id || nft.id || 'N/A';
+            addLine(`   • ${name} #${tokenId}`);
+          });
+          addLine('');
+        });
+
+        addLine(`🎨 Total NFTs: ${totalNFTs}`)
+
+      } catch (error) {
+        addLine(`❌ Failed to fetch NFT data: ${error}`, 'error');
+      }
     }
   };
 };
 
 // Command registry with all available commands
 export const COMMAND_LIST = [
-  'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'message', 
+  'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'nft_balance', 'message', 
   'price', 'chart', 'swap', 'rpc', 'trace', 'gas', 'networkinfo'
 ];
