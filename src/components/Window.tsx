@@ -146,7 +146,7 @@ export default function Window({
         className="window-header bg-gray-800 px-4 py-2 border-b border-gray-600 flex justify-between items-center cursor-grab"
         onMouseDown={handleMouseDown}
       >
-        <span className="text-green-400 text-sm font-medium select-none">{title}</span>
+        <span className="text-white text-sm font-medium select-none">{title}</span>
         <button
           onClick={onClose}
           className="text-gray-400 hover:text-red-400 font-bold text-lg w-6 h-6 flex items-center justify-center border border-gray-600 hover:border-red-400 transition-colors"
