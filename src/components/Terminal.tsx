@@ -451,7 +451,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         addLine(`🟡 Swap submitted: ${hash}`);
         addLine('⏳ Waiting for confirmation...');
         addLine(`✅ Swap transaction sent successfully!`);
-        addLine(`🔗 Transaction: ${hash.slice(0, 10)}...${hash.slice(-8)}`);
+        addLine(`🔗 Transaction: ${hash}`);
         
       } catch (txError: any) {
         if (txError?.message?.includes('User rejected')) {

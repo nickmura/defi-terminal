@@ -52,6 +52,7 @@ export const createCommands = (ctx: CommandContext) => {
       'history clear - Clear command history',
       'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
       'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace', 
+      'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
       'networkinfo [chain] - Get network information and statistics',
       'wallet - Show wallet info', 
       'balance - Show ETH balance', 
@@ -698,6 +699,120 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
+    gas: async (args: string[]) => {
+      let network = chainId.toString();
+      let gasAmount: number | null = null;
+
+      // Parse arguments (amount could be first arg, --network flag)
+      if (args.length > 0 && !args[0].startsWith('--')) {
+        const amount = parseFloat(args[0]);
+        if (!isNaN(amount) && amount > 0) {
+          gasAmount = amount;
+        }
+      }
+
+      // Find --network flag
+      const networkIndex = args.findIndex(arg => arg === '--network');
+      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+        const networkName = args[networkIndex + 1].toLowerCase();
+        const networkMap: { [key: string]: string } = {
+          'ethereum': '1',
+          'mainnet': '1',
+          'polygon': '137',
+          'matic': '137',
+          'optimism': '10',
+          'arbitrum': '42161',
+          'base': '8453',
+          'bsc': '56',
+          'avalanche': '43114'
+        };
+        network = networkMap[networkName] || networkName;
+      }
+
+      if (gasAmount) {
+        addLine(`⛽ Getting gas prices for ${gasAmount.toLocaleString()} gas units on chain ${network}...`);
+      } else {
+        addLine(`⛽ Getting gas prices for chain ${network}...`);
+      }
+      
+      try {
+        const response = await fetch(`/api/gas?chainId=${network}`);
+
+        if (!response.ok) {
+          const error = await response.json();
+          addLine(`❌ Failed to get gas prices: ${error.error}`, 'error');
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (gasAmount) {
+          addLine(`✅ Gas Prices & ETH Costs for ${gasAmount.toLocaleString()} gas units (Chain ${network}):`);
+        } else {
+          addLine(`✅ Current Gas Prices (Chain ${network}):`);
+        }
+        addLine('');
+        
+        if (data.baseFeeGwei) {
+          addLine(`📊 Base Fee: ${data.baseFeeGwei} gwei`);
+          addLine('');
+        }
+        
+        // Helper function to calculate ETH cost
+        const calculateETHCost = (maxFeePerGas: string, gasUnits: number) => {
+          const costWei = BigInt(maxFeePerGas) * BigInt(gasUnits);
+          const costETH = Number(costWei) / 1e18;
+          return costETH.toFixed(6);
+        };
+        
+        if (data.low && data.low.gwei) {
+          addLine(`🐌 Low: ${data.low.gwei} gwei`);
+          addLine(`   Max Fee: ${data.low.maxFeePerGas}`);
+          addLine(`   Max Priority: ${data.low.maxPriorityFeePerGas}`);
+          if (gasAmount) {
+            const ethCost = calculateETHCost(data.low.maxFeePerGas, gasAmount);
+            addLine(`   ETH Cost: ${ethCost} ETH`);
+          }
+          addLine('');
+        }
+        
+        if (data.medium && data.medium.gwei) {
+          addLine(`🚀 Medium: ${data.medium.gwei} gwei`);
+          addLine(`   Max Fee: ${data.medium.maxFeePerGas}`);
+          addLine(`   Max Priority: ${data.medium.maxPriorityFeePerGas}`);
+          if (gasAmount) {
+            const ethCost = calculateETHCost(data.medium.maxFeePerGas, gasAmount);
+            addLine(`   ETH Cost: ${ethCost} ETH`);
+          }
+          addLine('');
+        }
+        
+        if (data.high && data.high.gwei) {
+          addLine(`⚡ High: ${data.high.gwei} gwei`);
+          addLine(`   Max Fee: ${data.high.maxFeePerGas}`);
+          addLine(`   Max Priority: ${data.high.maxPriorityFeePerGas}`);
+          if (gasAmount) {
+            const ethCost = calculateETHCost(data.high.maxFeePerGas, gasAmount);
+            addLine(`   ETH Cost: ${ethCost} ETH`);
+          }
+          addLine('');
+        }
+        
+        if (data.instant && data.instant.gwei) {
+          addLine(`🔥 Instant: ${data.instant.gwei} gwei`);
+          addLine(`   Max Fee: ${data.instant.maxFeePerGas}`);
+          addLine(`   Max Priority: ${data.instant.maxPriorityFeePerGas}`);
+          if (gasAmount) {
+            const ethCost = calculateETHCost(data.instant.maxFeePerGas, gasAmount);
+            addLine(`   ETH Cost: ${ethCost} ETH`);
+          }
+        }
+
+      } catch (error) {
+        addLine(`❌ Failed to get gas prices: ${error}`, 'error');
+      }
+    },
+
     networkinfo: async (args: string[]) => {
       let network = chainId.toString();
 
@@ -815,5 +930,5 @@ export const createCommands = (ctx: CommandContext) => {
 // Command registry with all available commands
 export const COMMAND_LIST = [
   'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'message', 
-  'price', 'chart', 'swap', 'rpc', 'trace', 'networkinfo'
+  'price', 'chart', 'swap', 'rpc', 'trace', 'gas', 'networkinfo'
 ];
