@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    instrumentationHook: false,
-  },
-  // Disable telemetry
-  telemetry: false,
+  /* config options here */
 };
 
 export default nextConfig;

@@ -23,6 +23,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate input data
+    console.log('Limit order creation request:', {
+      fromChainId,
+      fromToken,
+      toToken,
+      amount,
+      price,
+      userAddress
+    });
+
+    if (!fromToken?.decimals || !toToken?.decimals) {
+      return NextResponse.json(
+        { error: 'Token decimals not provided' },
+        { status: 400 }
+      );
+    }
+
+    if (!fromToken?.address || !toToken?.address) {
+      return NextResponse.json(
+        { error: 'Token addresses not provided' },
+        { status: 400 }
+      );
+    }
+
+    if (!amount || isNaN(parseFloat(amount))) {
+      return NextResponse.json(
+        { error: 'Invalid amount provided' },
+        { status: 400 }
+      );
+    }
+
+    if (!price || isNaN(parseFloat(price))) {
+      return NextResponse.json(
+        { error: 'Invalid price provided' },
+        { status: 400 }
+      );
+    }
+
     // Create SDK instance
     const httpConnector = new FetchProviderConnector();
     const sdk = new Sdk({
@@ -37,8 +75,30 @@ export async function POST(request: NextRequest) {
 
 
 
-    const makerAssetAddress = getProperTokenAddress(fromToken, fromChainId);
-    const takerAssetAddress = getProperTokenAddress(toToken, fromChainId);
+    const makerAssetAddress = getProperTokenAddress({ address: fromToken.address }, fromChainId);
+    const takerAssetAddress = getProperTokenAddress({ address: toToken.address }, fromChainId);
+    
+    console.log('Token addresses:', {
+      makerAssetAddress,
+      takerAssetAddress,
+      fromTokenAddress: fromToken.address,
+      toTokenAddress: toToken.address
+    });
+    
+    // Validate addresses are strings
+    if (typeof makerAssetAddress !== 'string' || typeof takerAssetAddress !== 'string') {
+      console.error('Invalid address types:', {
+        makerType: typeof makerAssetAddress,
+        takerType: typeof takerAssetAddress,
+        maker: makerAssetAddress,
+        taker: takerAssetAddress
+      });
+      return NextResponse.json(
+        { error: 'Invalid token address format' },
+        { status: 400 }
+      );
+    }
+    
     // Optional expiration setup
     const expiresIn = BigInt(300); // 5 minutes
     const expiration = BigInt(Math.floor(Date.now() / 1000)) + expiresIn;

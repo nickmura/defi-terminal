@@ -72,12 +72,6 @@ export default function ChartWindow({
             top: 0.1,
             bottom: 0.1,
           },
-          // Custom price formatter for small decimal values
-          priceFormat: {
-            type: 'price',
-            precision: 10, // Start with high precision, will be overridden dynamically
-            minMove: 0.0000000001, // Support very small price movements
-          },
         },
         timeScale: {
           borderColor: '#4b5563',

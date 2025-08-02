@@ -15,7 +15,7 @@ export interface CommandContext {
   handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => Promise<void>;
   parseSwapCommand: (args: string[]) => any;
   parseLimitOrderCommand: (args: string[]) => any;
-  openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string) => void;
+  openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string, token0Symbol?: string, token1Symbol?: string) => void;
   updateTabName?: (operation: string, details?: string) => void;
   domain: string | null;
   hasDomain: boolean;
@@ -404,7 +404,7 @@ export const createCommands = (ctx: CommandContext) => {
       updateTabName?.('chart', `${token0Symbol.toLowerCase()}`);
       
       if (openChartModal) {
-        openChartModal(token0Address, token1Address, network, chartType, interval);
+        openChartModal(token0Address, token1Address, network, chartType, interval, token0Symbol, token1Symbol);
       } else {
         addLine('❌ Chart functionality not available', 'error');
       }

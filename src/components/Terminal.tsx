@@ -478,8 +478,8 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         return;
       }
       
-      const srcAddress = getTokenAddress(limitOrder.fromToken, parseInt(limitOrder.network));
-      const dstAddress = getTokenAddress(limitOrder.toToken, parseInt(limitOrder.network));
+      const srcAddress = await getTokenAddress(limitOrder.fromToken, parseInt(limitOrder.network));
+      const dstAddress = await getTokenAddress(limitOrder.toToken, parseInt(limitOrder.network));
 
       if (!srcAddress || !dstAddress) {
         addLine(`❌ Token not supported on network ${limitOrder.network}`, 'error');
@@ -489,11 +489,11 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       // Prepare token objects with decimals for the create endpoint
       const fromTokenInfo = {
         address: srcAddress,
-        decimals: getTokenDecimals(limitOrder.fromToken, parseInt(limitOrder.network))
+        decimals: await getTokenDecimals(limitOrder.fromToken, parseInt(limitOrder.network))
       };
       const toTokenInfo = {
         address: dstAddress,
-        decimals: getTokenDecimals(limitOrder.toToken, parseInt(limitOrder.network))
+        decimals: await getTokenDecimals(limitOrder.toToken, parseInt(limitOrder.network))
       };
 
       const createData = {
@@ -863,7 +863,11 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     if (isProcessing) return;
     
     if (e.key === 'Enter' && currentCommand.trim()) {
-      setCommandHistory(prev => [...prev, currentCommand]);
+      // Don't add yes/no responses to history
+      const trimmedCmd = currentCommand.trim().toLowerCase();
+      if (trimmedCmd !== 'yes' && trimmedCmd !== 'y' && trimmedCmd !== 'no' && trimmedCmd !== 'n') {
+        setCommandHistory(prev => [...prev, currentCommand]);
+      }
       executeCommand(currentCommand);
       setCurrentCommand('');
       setHistoryIndex(-1);
