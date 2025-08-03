@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         gasUsed: trace?.gasUsed ? (typeof trace.gasUsed === 'string' ? parseInt(trace.gasUsed, 16) : trace.gasUsed) : null,
         gasLimit: trace?.gasLimit ? (typeof trace.gasLimit === 'string' ? parseInt(trace.gasLimit, 16) : trace.gasLimit) : null,
         gasPrice: trace?.gasPrice ? parseInt(trace.gasPrice, 16) : null,
-        status: trace?.status,
+        status: trace?.status || 'confirmed',
         value: trace?.value ? parseInt(trace.value, 16) : 0,
         type: trace?.type,
         logCount: trace?.logs?.length || 0,

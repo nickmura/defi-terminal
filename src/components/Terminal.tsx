@@ -263,6 +263,23 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     addLine(`🔍 Getting market data for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
     addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
 
+    // Check for native token warning
+    const nativeTokens = ['eth', 'matic', 'bnb', 'avax'];
+    const isNativeToken = nativeTokens.includes(fromToken.toLowerCase()) || nativeTokens.includes(toToken.toLowerCase());
+    
+    if (isNativeToken) {
+      addLine('');
+      addLine('⚠️  WARNING: Limit orders cannot use native tokens (ETH, MATIC, BNB, AVAX)', 'error');
+      addLine('📦 You must use the wrapped version:', 'error');
+      addLine('   • ETH → WETH', 'error');
+      addLine('   • MATIC → WMATIC', 'error');
+      addLine('   • BNB → WBNB', 'error');
+      addLine('   • AVAX → WAVAX', 'error');
+      addLine('');
+      addLine('❌ Limit order cancelled. Please retry with wrapped tokens.', 'error');
+      return;
+    }
+
     // Check if network switch is needed
     const networkSwitched = await switchNetworkIfNeeded(network);
     if (!networkSwitched) {
