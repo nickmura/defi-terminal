@@ -1,0 +1,647 @@
+{
+  "result": [
+    {
+      "index": "0x4ce070d7e6f2885d",
+      "profit_abs_usd": null,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": null,
+      "rewards_tokens": null,
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0x8bf56ee66bcf542e",
+      "profit_abs_usd": null,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": null,
+      "rewards_tokens": null,
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xc7d1bd29cb3ae9dc",
+      "profit_abs_usd": null,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": null,
+      "rewards_tokens": null,
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
+          "decimals": 18,
+          "symbol": "weETH",
+          "name": "Wrapped eETH",
+          "amount": 0,
+          "price_usd": 3636.9648161499736,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0",
+          "decimals": 18,
+          "symbol": "wstETH",
+          "name": "Wrapped liquid staked Ether 2.0",
+          "amount": 0,
+          "price_usd": 4099.345617647818,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xd9a442856c234a39a81a089c06451ebaa4306a72",
+          "decimals": 18,
+          "symbol": "pufETH",
+          "name": "pufETH",
+          "amount": 0,
+          "price_usd": 3546.5575931015414,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x8c1bed5b9a0928467c9b1341da1d7bd5e10b6549",
+          "decimals": 18,
+          "symbol": "LsETH",
+          "name": "Liquid Staked ETH",
+          "amount": 0,
+          "price_usd": 3670.754229980195,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xbf5495efe5db9ce00f80364c8b423567e58d2110",
+          "decimals": 18,
+          "symbol": "ezETH",
+          "name": "Renzo Restaked ETH",
+          "amount": 0,
+          "price_usd": 3542.882493886415,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x8c9532a60e0e7c6bbd2b2c1303f63ace1c3e9811",
+          "decimals": 18,
+          "symbol": "pzETH",
+          "name": "Renzo Restaked LST ",
+          "amount": 0,
+          "price_usd": 4078.1263208121327,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xa1290d69c65a6fe4df752f95823fae25cb99e5a7",
+          "decimals": 18,
+          "symbol": "rsETH",
+          "name": "rsETH",
+          "amount": 0,
+          "price_usd": 3561.169364827066,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": 0,
+      "weighted_apr": 0,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+          "decimals": 18,
+          "symbol": "WETH",
+          "name": "Wrapped Ether",
+          "amount": 0,
+          "price_usd": 3393.164447957873,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x49446a0874197839d15395b908328a74ccc96bc0",
+          "decimals": 18,
+          "symbol": "mstETH",
+          "name": "mstETH",
+          "amount": 0,
+          "price_usd": 0,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x4c9edd5852cd905f086c759e8383e09bff1e68b3",
+          "decimals": 18,
+          "symbol": "USDe",
+          "name": "USDe",
+          "amount": 0,
+          "price_usd": 1.0010593118749007,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xfae103dc9cf190ed75350761e95403b7b8afa6c0",
+          "decimals": 18,
+          "symbol": "rswETH",
+          "name": "rswETH",
+          "amount": 0,
+          "price_usd": 3533.9999424519297,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+          "decimals": 8,
+          "symbol": "WBTC",
+          "name": "Wrapped BTC",
+          "amount": 0,
+          "price_usd": 112507.01916625367,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xd5f7838f5c461feff7fe49ea5ebaf7728bb0adfa",
+          "decimals": 0,
+          "symbol": "",
+          "name": "",
+          "amount": 0,
+          "price_usd": 3633.6275984194085,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x32bd822d615a3658a68b6fdd30c2fcb2c996d678",
+          "decimals": 18,
+          "symbol": "mswETH",
+          "name": "mswETH",
+          "amount": 0,
+          "price_usd": 0,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xc96de26018a54d51c097160568752c4e3bd6c364",
+          "decimals": 8,
+          "symbol": "FBTC",
+          "name": "Fire Bitcoin",
+          "amount": 0,
+          "price_usd": 112515.28372299462,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xf951e335afb289353dc249e82926178eac7ded78",
+          "decimals": 0,
+          "symbol": "",
+          "name": "",
+          "amount": 0,
+          "price_usd": 3716.884271814265,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xf469fbd2abcd6b9de8e169d128226c0fc90a012e",
+          "decimals": 8,
+          "symbol": "pumpBTC",
+          "name": "pumpBTC",
+          "amount": 0,
+          "price_usd": 110018.9577495371,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x8236a87084f8b84306f72007f36f2618a5634494",
+          "decimals": 8,
+          "symbol": "LBTC",
+          "name": "Lombard Staked Bitcoin",
+          "amount": 0,
+          "price_usd": 112504.77035716533,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+          "decimals": 6,
+          "symbol": "USDT",
+          "name": "Tether USD",
+          "amount": 0,
+          "price_usd": 1,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "decimals": 6,
+          "symbol": "USDC",
+          "name": "USD Coin",
+          "amount": 0,
+          "price_usd": 1.000215600580496,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x18f313fc6afc9b5fd6f0908c1b3d476e3fea1dd9",
+          "decimals": 18,
+          "symbol": "egETH",
+          "name": "Eigenpie Restaked ETH",
+          "amount": 0,
+          "price_usd": 0,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0xe46a5e19b19711332e33f33c2db3ea143e86bc10",
+          "decimals": 18,
+          "symbol": "mwBETH",
+          "name": "mwBETH",
+          "amount": 0,
+          "price_usd": 0,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    },
+    {
+      "index": "0xef3165506d4da77d",
+      "profit_abs_usd": 0,
+      "roi": null,
+      "weighted_apr": null,
+      "holding_time_days": 419,
+      "rewards_tokens": [
+        {
+          "chain_id": 1,
+          "address": "0x917cee801a67f933f2e6b33fc0cd1ed2d5909d88",
+          "decimals": 18,
+          "symbol": "weETHs",
+          "name": "Super Symbiotic LRT",
+          "amount": 0,
+          "price_usd": 3484.776159999454,
+          "value_usd": 0
+        }
+      ],
+      "rewards_usd": null,
+      "claimed_fees": null,
+      "unclaimed_fees": null,
+      "impermanent_loss": null,
+      "claimed_fees_usd": null,
+      "unclaimed_fees_usd": null,
+      "impermanent_loss_usd": null
+    }
+  ]
+}

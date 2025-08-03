@@ -55,7 +55,7 @@ export const createCommands = (ctx: CommandContext) => {
       'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
       'networkinfo [chain] - Get network information and statistics',
       'wallet - Show wallet info', 
-      'balance - Show all token balances using 1inch API',
+      'balance - Show native token balance',
       'nft_balance [address] - Show NFT holdings across all chains (defaults to connected wallet)', 
       'message <text> - Sign message (requires wallet)', 
       'price <symbol|address> [--network <name>] - Get token price', 
@@ -104,90 +104,17 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
-    balance: async () => {
+    balance: () => {
       if (!isConnected) {
         addLine('Wallet not connected. Click the Connect Wallet button above.', 'error');
         return;
       }
 
-      if (!address) {
-        addLine('Wallet address not available', 'error');
-        return;
-      }
-
-      const getNetworkName = (chainId: number) => {
-        const names: { [key: number]: string } = {
-          1: 'Ethereum',
-          137: 'Polygon', 
-          10: 'Optimism',
-          42161: 'Arbitrum',
-          8453: 'Base',
-          56: 'BSC',
-          43114: 'Avalanche'
-        };
-        return names[chainId] || `Chain ${chainId}`;
-      };
-
-      addLine(`🔍 Fetching token balances...`);
-      addLine(`🌐 Network: ${getNetworkName(chainId)}`);
-      addLine(`💳 Address: ${address?.slice(0, 6)}...${address?.slice(-4)}`);
-      addLine('');
-
-      try {
-        const response = await fetch(`/api/tokens/balances?walletAddress=${address}&chainId=${chainId}`);
-        
-        if (!response.ok) {
-          const error = await response.json();
-          addLine(`❌ Failed to fetch balances: ${error.error}`, 'error');
-          
-          // Fallback to just ETH balance from wagmi
-          if (balance) {
-            const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
-            addLine('');
-            addLine('📊 Fallback ETH Balance:');
-            addLine(`💰 ${formattedBalance} ${balance.symbol}`);
-          }
-          return;
-        }
-
-        const data = await response.json();
-        console.log(data)
-        if (data.totalTokens === 0) {
-          addLine('⚠️  No token balances found');
-          return;
-        }
-
-        addLine(`✅ Found ${data.totalTokens} tokens with balances:`);
-        addLine('');
-
-        // Show up to 10 tokens with largest balances
-        const topBalances = data.balances.slice(0, 10);
-        
-        for (const token of topBalances) {
-          // Skip tokens with zero balance
-          if (parseFloat(token.formattedBalance) > 0) {
-            addLine(`💰 ${token.displayBalance} ${token.symbol}`);
-            if (token.name && token.name !== token.symbol) {
-              addLine(`   ${token.name}`);
-            }
-          }
-        }
-
-        if (data.totalTokens > 10) {
-          addLine('');
-          addLine(`... and ${data.totalTokens - 10} more tokens`);
-        }
-
-      } catch (error) {
-        addLine(`❌ Error fetching balances: ${error}`, 'error');
-        
-        // Fallback to ETH balance from wagmi
-        if (balance) {
-          const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
-          addLine('');
-          addLine('📊 Fallback ETH Balance:');
-          addLine(`💰 ${formattedBalance} ${balance.symbol}`);
-        }
+      if (balance) {
+        const formattedBalance = (Number(balance.value) / Math.pow(10, balance.decimals)).toFixed(6);
+        addLine(`💰 ${formattedBalance} ${balance.symbol}`);
+      } else {
+        addLine('Balance: Loading...', 'error');
       }
     },
 
