@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "defi-terminal",
   description: "A web-based terminal for DeFi operations and blockchain interactions",
+  icons: {
+    icon: './window.svg'
+  }
 };
 
 export default function RootLayout({
