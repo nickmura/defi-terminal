@@ -12,7 +12,7 @@ export interface CommandContext {
   setCommandHistory: (history: string[]) => void;
   signMessageAsync: (params: { message: string }) => Promise<string>;
   handleClassicSwap: (amount: string, fromToken: string, toToken: string, network: string, slippage: string) => Promise<void>;
-  handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => Promise<void>;
+  handleLimitOrder: (amount: string, fromToken: string, toToken: string, network: string, rate?: string, expiration?: string) => Promise<void>;
   parseSwapCommand: (args: string[]) => any;
   parseLimitOrderCommand: (args: string[]) => any;
   openChartModal?: (token0: string, token1: string, chainId: string, chartType: 'candle' | 'line', interval?: string, token0Symbol?: string, token1Symbol?: string) => void;
@@ -63,7 +63,7 @@ export const createCommands = (ctx: CommandContext) => {
       'Intervals: 5m, 15m, 1h, 4h, 1d, 1w (default: 1h for candles)',
       'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
       'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 
-      'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'
+      'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] [--expiration <time>] - Create limit order'
     ].forEach(cmd => addLine(cmd)),
 
     clear: () => setLines([]),
@@ -167,14 +167,15 @@ export const createCommands = (ctx: CommandContext) => {
       } else if (args[0] === 'limit') {
         const parsed = parseLimitOrderCommand(args);
         if (!parsed) {
-          addLine('Usage: swap limit <amount> <from> <to> [--rate <rate>] [--network <name>]', 'error');
-          addLine('Example: swap limit 1 eth usdc --rate 4000 --network optimism', 'error');
+          addLine('Usage: swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] [--expiration <time>]', 'error');
+          addLine('Example: swap limit 1 weth usdc --rate 4000 --network base --expiration 1h', 'error');
+          addLine('Expiration options: 1m, 10m, 1h, 1d, 3d, 7d (default: 1h)', 'error');
           return;
         }
 
-        const { amount, fromToken, toToken, network, rate } = parsed;
+        const { amount, fromToken, toToken, network, rate, expiration } = parsed;
         updateTabName?.('swap', 'limit');
-        await handleLimitOrder(amount, fromToken, toToken, network, rate);
+        await handleLimitOrder(amount, fromToken, toToken, network, rate, expiration);
         
       } else {
         addLine('Usage: swap <classic|limit> <amount> <from> <to> [options]', 'error');
@@ -653,7 +654,7 @@ export const createCommands = (ctx: CommandContext) => {
         addLine(`  Internal Calls: ${summary.callCount}`);
         
         if (trace.input && trace.input !== '0x') {
-          addLine(`  Input Data: ${trace.input.slice(0, 42)}...`);
+          addLine(`  Input Data: ${trace.input}`);
         }
         
         // Show logs if any
@@ -665,7 +666,7 @@ export const createCommands = (ctx: CommandContext) => {
             addLine(`    Contract: ${log.contract}`);
             addLine(`    Topics: ${log.topics.length}`);
             if (log.data && log.data !== '0x') {
-              addLine(`    Data: ${log.data.slice(0, 42)}...`);
+              addLine(`    Data: ${log.data}`);
             }
           });
         }
@@ -915,7 +916,9 @@ export const createCommands = (ctx: CommandContext) => {
     },
 
     nft_balance: async (args: string[]) => {
+      console.log('nft_balance args:', args);
       const targetAddress = args[0] || address;
+      console.log('targetAddress:', targetAddress, 'connected address:', address);
       
       if (!targetAddress) {
         addLine('❌ No address provided and no wallet connected', 'error');

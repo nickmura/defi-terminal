@@ -32,6 +32,7 @@ interface LimitOrderQuote {
   amount: string;
   network: string;
   rate?: string;
+  expiration?: string;
   quote: any;
 }
 
@@ -214,6 +215,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     let [type, amount, fromToken, toToken] = args;
     let network = chainId.toString();
     let rate: string | undefined;
+    let expiration: string = '1h'; // Default to 1 hour
     
     // Check for --network flag
     const networkIndex = args.findIndex(arg => arg === '--network');
@@ -221,6 +223,9 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       const networkName = args[networkIndex + 1].toLowerCase();
       if (networkName === 'optimism') network = '10';
       else if (networkName === 'arbitrum') network = '42161';
+      else if (networkName === 'base') network = '8453';
+      else if (networkName === 'polygon') network = '137';
+      else if (networkName === 'ethereum') network = '1';
     }
     
     // Check for --rate flag
@@ -229,7 +234,17 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       rate = args[rateIndex + 1];
     }
     
-    return { type, amount, fromToken, toToken, network, rate };
+    // Check for --expiration flag
+    const expirationIndex = args.findIndex(arg => arg === '--expiration' || arg === '--exp');
+    if (expirationIndex !== -1 && expirationIndex + 1 < args.length) {
+      const exp = args[expirationIndex + 1];
+      const validExpirations = ['1m', '10m', '1h', '1d', '3d', '7d'];
+      if (validExpirations.includes(exp)) {
+        expiration = exp;
+      }
+    }
+    
+    return { type, amount, fromToken, toToken, network, rate, expiration };
   };
 
   const switchNetworkIfNeeded = async (targetNetwork: string): Promise<boolean> => {
@@ -259,9 +274,23 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     }
   };
 
-  const handleLimitOrder = async (amount: string, fromToken: string, toToken: string, network: string, rate?: string) => {
+  const handleLimitOrder = async (amount: string, fromToken: string, toToken: string, network: string, rate?: string, expiration?: string) => {
     addLine(`🔍 Getting market data for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
-    addLine(`🌐 Network: ${network === '10' ? 'Optimism' : network === '42161' ? 'Arbitrum' : network}`);
+    
+    const getNetworkName = (chainId: string) => {
+      const names: { [key: string]: string } = {
+        '1': 'Ethereum',
+        '10': 'Optimism',
+        '42161': 'Arbitrum',
+        '8453': 'Base',
+        '137': 'Polygon',
+        '56': 'BSC',
+        '43114': 'Avalanche'
+      };
+      return names[chainId] || `Chain ${chainId}`;
+    };
+    
+    addLine(`🌐 Network: ${getNetworkName(network)}`);
 
     // Check for native token warning
     const nativeTokens = ['eth', 'matic', 'bnb', 'avax'];
@@ -349,6 +378,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
           amount,
           network,
           rate,
+          expiration,
           quote: { marketRate: currentRate, suggestedRate: rate }
         });
         setAwaitingConfirmation(true);
@@ -361,6 +391,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
           amount,
           network,
           rate: currentRate.toFixed(6),
+          expiration,
           quote: { marketRate: currentRate, suggestedRate: currentRate.toFixed(6) }
         });
         setAwaitingConfirmation(true);
@@ -522,11 +553,37 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         userAddress: address
       };
 
+      const formatExpiration = (exp: string) => {
+        const mapping: { [key: string]: string } = {
+          '1m': '1 minute',
+          '10m': '10 minutes', 
+          '1h': '1 hour',
+          '1d': '1 day',
+          '3d': '3 days',
+          '7d': '7 days'
+        };
+        return mapping[exp] || exp;
+      };
+
       addLine(`📋 Creating limit order:`);
       addLine(`   Sell: ${limitOrder.amount} ${limitOrder.fromToken.toUpperCase()}`);
       addLine(`   Buy: ${limitOrder.toToken.toUpperCase()}`);
       addLine(`   Rate: ${limitOrder.rate} ${limitOrder.toToken.toUpperCase()} per ${limitOrder.fromToken.toUpperCase()}`);
-      addLine(`   Network: ${limitOrder.network === '10' ? 'Optimism' : 'Arbitrum'}`);
+      addLine(`   Expires: ${formatExpiration(limitOrder.expiration || '1h')}`);
+      const getNetworkNameLocal = (chainId: string) => {
+        const names: { [key: string]: string } = {
+          '1': 'Ethereum',
+          '10': 'Optimism',
+          '42161': 'Arbitrum',
+          '8453': 'Base',
+          '137': 'Polygon',
+          '56': 'BSC',
+          '43114': 'Avalanche'
+        };
+        return names[chainId] || `Chain ${chainId}`;
+      };
+      
+      addLine(`   Network: ${getNetworkNameLocal(limitOrder.network)}`);
 
       const response = await fetch('/api/orderbook/limit/create', {
         method: 'POST',
