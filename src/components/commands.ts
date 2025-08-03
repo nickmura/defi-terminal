@@ -653,7 +653,7 @@ export const createCommands = (ctx: CommandContext) => {
         addLine(`  Internal Calls: ${summary.callCount}`);
         
         if (trace.input && trace.input !== '0x') {
-          addLine(`  Input Data: ${trace.input.slice(0, 42)}...`);
+          addLine(`  Input Data: ${trace.input}`);
         }
         
         // Show logs if any
