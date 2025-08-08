@@ -1,36 +1,27 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# defi-terminal
 
-## Getting Started
+**defi-terminal** (codename) is an open-source developer tool built on 1inch offering a command-based interface for interacting with Ethereum protocols and querying on-chain data. It acts like a programmable shell for DeFi — built for developers, researchers, and power users who need a fast, composable alternative to fragmented dashboards. We built this as a proof of concept for 1inch Unite Defi
 
-First, run the development server:
+### Features
+- Command line in the browser for ease of access DeFi on different protocols (with wallet)
+- Call commands like **swap**, **price**, **chart**, **trace**, **rpc** & more
+- Fetch token data from 1000+ of tokens across EVM chains (via 1inch)
+- Supports many EVM chains (Ethereum, Optimism, Arbitrum, Base, Polygon, & more)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Use Cases
+- Instant, easy swaps/limit orders, (e.g **swap classic 1 eth usdc**, **swap limit 1 eth usdc --rate 4000 --expiration 7d**)
+- Trace transactions and easy to use RPC calls
+- Script DeFi interactions across protocols in different tabs/terminals
+- Use the latest & greatest in DeFi as implemented
+- Contribute plugins & hooks for your favorite dapps
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Tech Stack
+- TypeScript / Node.js / Next.js
+- viem / wagmi for Ethereum client interactions
+- Modular plugin architecture for protocol integrations
+- 1inch API (over 15+ endpoints)
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+We welcome feedback, contributions, and collaboration from the community.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
