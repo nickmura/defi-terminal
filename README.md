@@ -1,4 +1,4 @@
-# defi-terminal
+# 1inch-defi-terminal
 
 **defi-terminal** (codename) is an open-source developer tool built on 1inch offering a command-based interface for interacting with Ethereum protocols and querying on-chain data. It acts like a programmable shell for DeFi — built for developers, researchers, and power users who need a fast, composable alternative to fragmented dashboards. We built this as a proof of concept for 1inch Unite Defi
 

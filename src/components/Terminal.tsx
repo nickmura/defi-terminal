@@ -67,7 +67,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
   const { switchChainAsync } = useSwitchChain();
   
   const [lines, setLines] = useState<TerminalLine[]>([
-    { id: 0, type: 'output', content: 'Welcome to DeFi Terminal v0.1.0, powered by 1inch', timestamp: new Date() },
+    { id: 0, type: 'output', content: 'DeFi Terminal v0.1.0', timestamp: new Date() },
     { id: 1, type: 'output', content: 'Type "help" for available commands.', timestamp: new Date() }
   ]);
   const [currentCommand, setCurrentCommand] = useState('');
@@ -191,12 +191,37 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     let network = chainId.toString();
     let slippage = '1'; // Default slippage 1%
     
-    // Check for --network flag
+    // Network map for shortcuts
+    const networkMap: { [key: string]: string } = {
+      'ethereum': '1',
+      'mainnet': '1',
+      'polygon': '137',
+      'matic': '137',
+      'optimism': '10',
+      'arbitrum': '42161',
+      'arb': '42161',
+      'base': '8453',
+      'bsc': '56',
+      'binance': '56',
+      'avalanche': '43114',
+      'avax': '43114'
+    };
+    
+    // Check for network shortcuts (e.g., --optimism, --arbitrum)
+    for (const [networkName, chainId] of Object.entries(networkMap)) {
+      if (args.includes(`--${networkName}`)) {
+        network = chainId;
+        break;
+      }
+    }
+    
+    // Also check for --network flag with value
     const networkIndex = args.findIndex(arg => arg === '--network');
     if (networkIndex !== -1 && networkIndex + 1 < args.length) {
       const networkName = args[networkIndex + 1].toLowerCase();
-      if (networkName === 'optimism') network = '10';
-      else if (networkName === 'arbitrum') network = '42161';
+      if (networkMap[networkName]) {
+        network = networkMap[networkName];
+      }
     }
     
     // Check for --slippage flag
@@ -215,12 +240,37 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
     let network = chainId.toString();
     let rate: string | undefined;
     
-    // Check for --network flag
+    // Network map for shortcuts
+    const networkMap: { [key: string]: string } = {
+      'ethereum': '1',
+      'mainnet': '1',
+      'polygon': '137',
+      'matic': '137',
+      'optimism': '10',
+      'arbitrum': '42161',
+      'arb': '42161',
+      'base': '8453',
+      'bsc': '56',
+      'binance': '56',
+      'avalanche': '43114',
+      'avax': '43114'
+    };
+    
+    // Check for network shortcuts (e.g., --optimism, --arbitrum)
+    for (const [networkName, chainId] of Object.entries(networkMap)) {
+      if (args.includes(`--${networkName}`)) {
+        network = chainId;
+        break;
+      }
+    }
+    
+    // Also check for --network flag with value
     const networkIndex = args.findIndex(arg => arg === '--network');
     if (networkIndex !== -1 && networkIndex + 1 < args.length) {
       const networkName = args[networkIndex + 1].toLowerCase();
-      if (networkName === 'optimism') network = '10';
-      else if (networkName === 'arbitrum') network = '42161';
+      if (networkMap[networkName]) {
+        network = networkMap[networkName];
+      }
     }
     
     // Check for --rate flag
@@ -757,7 +807,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white hover:text-gray-300 underline"
+            className="text-gray-200 hover:text-white underline"
           >
             {part}
           </a>
@@ -919,7 +969,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
   };
 
   return (
-    <div className="w-full h-full bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
+    <div className="w-full h-full bg-black text-gray-100 font-mono text-sm overflow-hidden flex flex-col">
       <div 
         ref={terminalRef} 
         className="flex-1 p-4 overflow-y-auto cursor-text" 
@@ -935,7 +985,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
             <Timestamp timestamp={line.timestamp} />
             <span className={`flex-1 select-text ${
               line.type === 'command' ? 'text-white' :
-              line.type === 'error' ? 'text-red-400' : 'text-gray-300'
+              line.type === 'error' ? 'text-gray-400' : 'text-gray-200'
             }`}>
               {renderContentWithLinks(line.content)}
             </span>
@@ -945,14 +995,14 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         {!isProcessing ? (
           <div className="flex items-center space-x-2 mt-2">
             <CurrentTime />
-            <span className="text-white">$</span>
+            <span className="text-gray-300">$</span>
             <input
               ref={inputRef}
               type="text"
               value={currentCommand}
               onChange={(e) => setCurrentCommand(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 bg-transparent text-white outline-none caret-white"
+              className="flex-1 bg-transparent text-white outline-none caret-gray-300"
               spellCheck={false}
               autoComplete="off"
             />
@@ -960,7 +1010,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         ) : (
           <div className="flex items-center space-x-2 mt-2">
             <CurrentTime />
-            <span className="text-yellow-400 animate-pulse">Processing...</span>
+            <span className="text-gray-400 animate-pulse">Processing...</span>
           </div>
         )}
       </div>

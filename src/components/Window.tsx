@@ -130,7 +130,7 @@ export default function Window({
   return (
     <div
       ref={windowRef}
-      className="absolute bg-gray-900 border border-gray-600 shadow-2xl overflow-hidden"
+      className="absolute bg-black border border-gray-800 shadow-2xl overflow-hidden"
       style={{
         left: position.x,
         top: position.y,
@@ -143,13 +143,13 @@ export default function Window({
     >
       {/* Window Header */}
       <div
-        className="window-header bg-gray-800 px-4 py-2 border-b border-gray-600 flex justify-between items-center cursor-grab"
+        className="window-header bg-gray-900 px-4 py-2 border-b border-gray-800 flex justify-between items-center cursor-grab"
         onMouseDown={handleMouseDown}
       >
-        <span className="text-white text-sm font-medium select-none">{title}</span>
+        <span className="text-gray-100 text-sm font-medium select-none">{title}</span>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-red-400 font-bold text-lg w-6 h-6 flex items-center justify-center border border-gray-600 hover:border-red-400 transition-colors"
+          className="text-gray-500 hover:text-gray-200 font-bold text-lg w-6 h-6 flex items-center justify-center border border-gray-800 hover:border-gray-600 transition-colors"
           title="Close"
         >
           ×
@@ -164,37 +164,37 @@ export default function Window({
       {/* Resize Handles */}
       {/* Corners - avoid title bar area (first 40px) */}
       <div
-        className="absolute top-10 left-0 w-3 h-3 cursor-nw-resize hover:bg-green-400 hover:opacity-50 transition-colors"
+        className="absolute top-10 left-0 w-3 h-3 cursor-nw-resize hover:bg-gray-600 hover:opacity-50 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'top-left')}
       />
       <div
-        className="absolute top-10 right-0 w-3 h-3 cursor-ne-resize hover:bg-green-400 hover:opacity-50 transition-colors"
+        className="absolute top-10 right-0 w-3 h-3 cursor-ne-resize hover:bg-gray-600 hover:opacity-50 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'top-right')}
       />
       <div
-        className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize hover:bg-green-400 hover:opacity-50 transition-colors"
+        className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize hover:bg-gray-600 hover:opacity-50 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'bottom-left')}
       />
       <div
-        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize hover:bg-green-400 hover:opacity-50 transition-colors"
+        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize hover:bg-gray-600 hover:opacity-50 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'bottom-right')}
       />
 
       {/* Edges - avoid title bar area */}
       <div
-        className="absolute top-10 left-3 right-3 h-2 cursor-n-resize hover:bg-green-400 hover:opacity-30 transition-colors"
+        className="absolute top-10 left-3 right-3 h-2 cursor-n-resize hover:bg-gray-600 hover:opacity-30 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'top')}
       />
       <div
-        className="absolute bottom-0 left-3 right-3 h-2 cursor-s-resize hover:bg-green-400 hover:opacity-30 transition-colors"
+        className="absolute bottom-0 left-3 right-3 h-2 cursor-s-resize hover:bg-gray-600 hover:opacity-30 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'bottom')}
       />
       <div
-        className="absolute left-0 top-10 bottom-3 w-2 cursor-w-resize hover:bg-green-400 hover:opacity-30 transition-colors"
+        className="absolute left-0 top-10 bottom-3 w-2 cursor-w-resize hover:bg-gray-600 hover:opacity-30 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'left')}
       />
       <div
-        className="absolute right-0 top-10 bottom-3 w-2 cursor-e-resize hover:bg-green-400 hover:opacity-30 transition-colors"
+        className="absolute right-0 top-10 bottom-3 w-2 cursor-e-resize hover:bg-gray-600 hover:opacity-30 transition-colors"
         onMouseDown={(e) => handleResizeMouseDown(e, 'right')}
       />
     </div>

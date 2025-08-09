@@ -108,15 +108,15 @@ export default function TabbedTerminal() {
   }, [tabs, activeTab]);
 
   return (
-    <div className="w-full h-screen bg-black text-green-400 font-mono text-sm overflow-hidden flex flex-col">
+    <div className="w-full h-screen bg-black text-gray-100 font-mono text-sm overflow-hidden flex flex-col">
       {/* Main Header/Navbar */}
-      <div className="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center">
-        <span className="text-gray-300 text-xs">
+      <div className="bg-black px-4 py-2 border-b border-gray-900 flex justify-between items-center">
+        <span className="text-gray-400 text-xs">
           {isConnected ? (
             hasDomain && typeof domain === 'string' ? `${domain}@terminal` : `${address?.slice(0, 6)}...${address?.slice(-4)}@terminal`
           ) : 'defi-user@terminal'}
           {isLoading && isConnected && (
-            <span className="ml-1 text-yellow-400">...</span>
+            <span className="ml-1 text-gray-500">...</span>
           )}
         </span>
         <div className="flex items-center space-x-3">
@@ -127,7 +127,7 @@ export default function TabbedTerminal() {
       </div>
 
       {/* Tab Bar */}
-      <div className="bg-gray-900 border-b border-gray-700 flex items-center px-2 py-1">
+      <div className="bg-gray-900 border-b border-gray-800 flex items-center px-2 py-1">
         <div className="flex-1 flex items-center gap-1 overflow-x-auto">
           {tabs.map((tab) => {
             // Dynamic width based on number of tabs
@@ -138,8 +138,8 @@ export default function TabbedTerminal() {
                 key={tab.id}
                 className={`flex items-center group rounded-t-lg overflow-hidden transition-all ${
                   activeTab === tab.id
-                    ? 'bg-black shadow-lg'
-                    : 'bg-gray-800 hover:bg-gray-700'
+                    ? 'bg-black border-b border-black'
+                    : 'bg-gray-900 hover:bg-gray-800 border-b border-gray-800'
                 } ${tabWidth}`}
               >
                 <button
@@ -158,7 +158,7 @@ export default function TabbedTerminal() {
                 {tabs.length > 1 && (
                   <button
                     onClick={() => closeTab(tab.id)}
-                    className="px-2 py-1.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm"
+                    className="px-2 py-1.5 text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm"
                     title="Close tab"
                   >
                     ×
@@ -172,7 +172,7 @@ export default function TabbedTerminal() {
         {/* New Tab Button */}
         <button
           onClick={addNewTab}
-          className="ml-1 px-3 py-1 text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-all text-sm"
+          className="ml-1 px-3 py-1 text-gray-500 hover:text-gray-300 bg-gray-900 hover:bg-gray-800 rounded-lg transition-all text-sm"
           title="New terminal (Ctrl+T)"
         >
           +
@@ -194,7 +194,7 @@ export default function TabbedTerminal() {
       </div>
 
       {/* Status Bar */}
-      <div className="bg-gray-800 px-4 py-1 border-t border-gray-700 text-xs text-gray-400 flex justify-between">
+      <div className="bg-black px-4 py-1 border-t border-gray-900 text-xs text-gray-500 flex justify-between">
         <span>Tab: autocomplete • Ctrl+L: clear • ↑/↓: history</span>
         <span>Ctrl+T: new • Ctrl+W: close • Ctrl+Tab: next • Ctrl+1-9: switch • Active: {tabs.find(t => t.id === activeTab)?.name}</span>
       </div>

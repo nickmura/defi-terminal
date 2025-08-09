@@ -59,8 +59,8 @@ export default function ChartWindow({
           attributionLogo: false,
         },
         grid: {
-          vertLines: { color: '#374151' },
-          horzLines: { color: '#374151' },
+          vertLines: { color: '#1f2937' },
+          horzLines: { color: '#1f2937' },
         },
         crosshair: {
           mode: CrosshairMode.Normal,
@@ -316,7 +316,7 @@ export default function ChartWindow({
           
           // Create line series with proper price formatting
           const lineSeries = chartRef.current.addLineSeries({
-            color: '#10b981',
+            color: '#6b7280',
             lineWidth: 2,
             priceFormat: {
               type: 'price',
@@ -363,16 +363,16 @@ export default function ChartWindow({
       minSize={{ width: 600, height: 400 }}
     >
       {/* Chart Content */}
-      <div className="flex-1 bg-black text-green-400 font-mono relative h-full flex flex-col">
+      <div className="flex-1 bg-black text-gray-200 font-mono relative h-full flex flex-col">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
-            <div className="text-green-400">Loading chart data...</div>
+            <div className="text-gray-400">Loading chart data...</div>
           </div>
         )}
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-10">
-            <div className="text-red-400">Error: {error}</div>
+            <div className="text-gray-500">Error: {error}</div>
           </div>
         )}
 
@@ -386,7 +386,7 @@ export default function ChartWindow({
         </div>
         
         {/* Status Bar */}
-        <div className="bg-gray-800 border-t border-gray-600 px-4 py-2 text-xs text-gray-400 flex-shrink-0">
+        <div className="bg-gray-900 border-t border-gray-800 px-4 py-2 text-xs text-gray-400 flex-shrink-0">
           Network: {chainId === '1' ? 'Ethereum' : chainId === '10' ? 'Optimism' : 'Arbitrum'} | 
           Chart Type: {chartType === 'candle' ? 'Candlestick' : 'Line'} | 
           Last updated: {new Date().toLocaleTimeString()} | 
@@ -395,7 +395,7 @@ export default function ChartWindow({
             href="https://www.tradingview.com" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 underline"
+            className="text-gray-300 hover:text-gray-100 underline"
           >
             TradingView
           </a>

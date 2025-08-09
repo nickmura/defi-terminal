@@ -1,5 +1,41 @@
 import { resolveTokenAddress } from '../app/helper';
 
+// Helper function to parse network from args
+const parseNetwork = (args: string[], defaultNetwork: string): { network: string; networkIndex: number } => {
+  const networkMap: { [key: string]: string } = {
+    'ethereum': '1',
+    'mainnet': '1',
+    'polygon': '137',
+    'matic': '137',
+    'optimism': '10',
+    'arbitrum': '42161',
+    'arb': '42161',
+    'base': '8453',
+    'bsc': '56',
+    'binance': '56',
+    'avalanche': '43114',
+    'avax': '43114'
+  };
+  
+  // Check for network shortcuts (e.g., --optimism, --arbitrum)
+  for (const [networkName, chainId] of Object.entries(networkMap)) {
+    if (args.includes(`--${networkName}`)) {
+      return { network: chainId, networkIndex: args.indexOf(`--${networkName}`) };
+    }
+  }
+  
+  // Check for --network flag with value
+  const networkIndex = args.findIndex(arg => arg === '--network');
+  if (networkIndex !== -1 && networkIndex + 1 < args.length) {
+    const networkName = args[networkIndex + 1].toLowerCase();
+    if (networkMap[networkName]) {
+      return { network: networkMap[networkName], networkIndex };
+    }
+  }
+  
+  return { network: defaultNetwork, networkIndex: -1 };
+};
+
 // Types for command context
 export interface CommandContext {
   addLine: (content: string, type?: 'output' | 'error' | 'command') => void;
@@ -192,30 +228,7 @@ export const createCommands = (ctx: CommandContext) => {
       }
 
       const token = args[0];
-      let network = chainId.toString();
-      
-      // Check for --network flag
-      const networkIndex = args.findIndex(arg => arg === '--network');
-      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
-        const networkName = args[networkIndex + 1].toLowerCase();
-        const networkMap: { [key: string]: string } = {
-          'ethereum': '1',
-          'mainnet': '1',
-          'polygon': '137',
-          'matic': '137',
-          'optimism': '10',
-          'arbitrum': '42161',
-          'arb': '42161',
-          'base': '8453',
-          'bsc': '56',
-          'binance': '56',
-          'avalanche': '43114',
-          'avax': '43114'
-        };
-        if (networkMap[networkName]) {
-          network = networkMap[networkName];
-        }
-      }
+      const { network } = parseNetwork(args, chainId.toString());
 
       try {
         let tokenAddress = token;
@@ -296,43 +309,19 @@ export const createCommands = (ctx: CommandContext) => {
 
     chart: async (args: string[]) => {
       if (args.length < 1) {
-        addLine('Usage: chart <token0> [token1] [--type candle|line] [--network <name>]', 'error');
+        addLine('Usage: chart <token0> [token1] [--type candle|line] [--network <name>] | [--<network>]', 'error');
         addLine('Example: chart eth          # ETH/USDC chart (USDC default)', 'error');
         addLine('Example: chart eth usdt     # ETH/USDT chart', 'error');
-        addLine('Example: chart arb --network arbitrum  # ARB/USDC on Arbitrum', 'error');
+        addLine('Example: chart arb --arbitrum  # ARB/USDC on Arbitrum (shortcut)', 'error');
+        addLine('Example: chart op --optimism  # OP/USDC on Optimism', 'error');
         return;
       }
 
-      const token0Symbol = args[0];
-      const token1Symbol = args[1] || 'usdc'; // Default to USDC
-      let network = chainId.toString();
+      // First, extract flags and their values
+      const { network, networkIndex } = parseNetwork(args, chainId.toString());
       let chartType: 'candle' | 'line' = 'candle';
       let interval = '1h'; // Default interval
 
-      // Check for --network flag
-      const networkIndex = args.findIndex(arg => arg === '--network');
-      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
-        const networkName = args[networkIndex + 1].toLowerCase();
-        const networkMap: { [key: string]: string } = {
-          'ethereum': '1',
-          'mainnet': '1',
-          'polygon': '137',
-          'matic': '137',
-          'optimism': '10',
-          'arbitrum': '42161',
-          'arb': '42161',
-          'base': '8453',
-          'bsc': '56',
-          'binance': '56',
-          'avalanche': '43114',
-          'avax': '43114'
-        };
-        if (networkMap[networkName]) {
-          network = networkMap[networkName];
-        }
-      }
-
-      // Check for --type flag
       const typeIndex = args.findIndex(arg => arg === '--type');
       if (typeIndex !== -1 && typeIndex + 1 < args.length) {
         const type = args[typeIndex + 1].toLowerCase();
@@ -341,7 +330,6 @@ export const createCommands = (ctx: CommandContext) => {
         }
       }
 
-      // Check for --interval flag
       const intervalIndex = args.findIndex(arg => arg === '--interval');
       if (intervalIndex !== -1 && intervalIndex + 1 < args.length) {
         const inputInterval = args[intervalIndex + 1].toLowerCase();
@@ -357,6 +345,32 @@ export const createCommands = (ctx: CommandContext) => {
           return;
         }
       }
+      
+      // Filter out flags and their values to get only token arguments
+      const flagIndices = new Set<number>();
+      
+      // Add network flag indices
+      if (networkIndex !== -1) {
+        flagIndices.add(networkIndex);
+        // If it's --network with a value, also add the next index
+        if (args[networkIndex] === '--network') {
+          flagIndices.add(networkIndex + 1);
+        }
+      }
+      
+      // Add other flag indices
+      [typeIndex, intervalIndex].forEach(idx => {
+        if (idx !== -1) {
+          flagIndices.add(idx);
+          flagIndices.add(idx + 1);
+        }
+      });
+      
+      const tokenArgs = args.filter((_, index) => !flagIndices.has(index));
+      
+      // Now get tokens from filtered arguments
+      const token0Symbol = tokenArgs[0];
+      const token1Symbol = tokenArgs[1] || 'usdc'; // Default to USDC
 
       // Resolve token symbols to addresses
       let token0Address = token0Symbol;
@@ -415,27 +429,17 @@ export const createCommands = (ctx: CommandContext) => {
 
       const method = args[0];
       let params: any[] = [];
-      let network = chainId.toString();
-
-      // Find --network flag
-      const networkIndex = args.findIndex(arg => arg === '--network');
-      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
-        const networkName = args[networkIndex + 1].toLowerCase();
-        const networkMap: { [key: string]: string } = {
-          'ethereum': '1',
-          'mainnet': '1',
-          'polygon': '137',
-          'matic': '137',
-          'optimism': '10',
-          'arbitrum': '42161',
-          'base': '8453',
-          'bsc': '56',
-          'avalanche': '43114'
-        };
-        network = networkMap[networkName] || networkName;
-        
-        // Remove network args from params
-        args = args.slice(1, networkIndex);
+      const { network, networkIndex } = parseNetwork(args, chainId.toString());
+      
+      // Remove network args from params
+      if (networkIndex !== -1) {
+        // If it's --network with value, remove both flag and value
+        if (args[networkIndex] === '--network') {
+          args = [...args.slice(1, networkIndex), ...args.slice(networkIndex + 2)];
+        } else {
+          // It's a shortcut like --optimism, just remove that one
+          args = [...args.slice(1, networkIndex), ...args.slice(networkIndex + 1)];
+        }
       } else {
         args = args.slice(1);
       }
@@ -534,27 +538,9 @@ export const createCommands = (ctx: CommandContext) => {
 
       const txHash = args[0];
       let blockNumber: string | undefined = args[1];
-      let network = chainId.toString();
+      const { network } = parseNetwork(args, chainId.toString());
 
-      // Find --network flag
-      const networkIndex = args.findIndex(arg => arg === '--network');
-      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
-        const networkName = args[networkIndex + 1].toLowerCase();
-        const networkMap: { [key: string]: string } = {
-          'ethereum': '1',
-          'mainnet': '1',
-          'polygon': '137',
-          'matic': '137',
-          'optimism': '10',
-          'arbitrum': '42161',
-          'base': '8453',
-          'bsc': '56',
-          'avalanche': '43114'
-        };
-        network = networkMap[networkName] || networkName;
-      }
-
-      // Check if blockNumber looks like --network flag (meaning no block number provided)
+      // Check if blockNumber looks like a flag (meaning no block number provided)
       if (blockNumber && blockNumber.startsWith('--')) {
         blockNumber = undefined;
       }
@@ -689,7 +675,7 @@ export const createCommands = (ctx: CommandContext) => {
     },
 
     gas: async (args: string[]) => {
-      let network = chainId.toString();
+      const { network } = parseNetwork(args, chainId.toString());
       let gasAmount: number | null = null;
 
       // Parse arguments (amount could be first arg, --network flag)
@@ -698,24 +684,6 @@ export const createCommands = (ctx: CommandContext) => {
         if (!isNaN(amount) && amount > 0) {
           gasAmount = amount;
         }
-      }
-
-      // Find --network flag
-      const networkIndex = args.findIndex(arg => arg === '--network');
-      if (networkIndex !== -1 && networkIndex + 1 < args.length) {
-        const networkName = args[networkIndex + 1].toLowerCase();
-        const networkMap: { [key: string]: string } = {
-          'ethereum': '1',
-          'mainnet': '1',
-          'polygon': '137',
-          'matic': '137',
-          'optimism': '10',
-          'arbitrum': '42161',
-          'base': '8453',
-          'bsc': '56',
-          'avalanche': '43114'
-        };
-        network = networkMap[networkName] || networkName;
       }
 
       if (gasAmount) {
