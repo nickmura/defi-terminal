@@ -1,4 +1,5 @@
 import { resolveTokenAddress } from '../app/helper';
+import { pluginRegistry } from '@/plugins/registry';
 
 // Helper function to parse network from args
 const parseNetwork = (args: string[], defaultNetwork: string): { network: string; networkIndex: number } => {
@@ -79,28 +80,41 @@ export const createCommands = (ctx: CommandContext) => {
   } = ctx;
 
   return {
-    help: () => [
-      'help - Show commands', 
-      'clear - Clear terminal', 
-      'date - Show date', 
-      'whoami - Show user', 
-      'history - Command history', 
-      'history clear - Clear command history',
-      'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
-      'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace', 
-      'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
-      'networkinfo [chain] - Get network information and statistics',
-      'wallet - Show wallet info', 
-      'balance - Show native token balance',
-      'nft_balance [address] - Show NFT holdings across all chains (defaults to connected wallet)', 
-      'message <text> - Sign message (requires wallet)', 
-      'price <symbol|address> [--network <name>] - Get token price', 
-      'chart <token0> [token1] [--type candle|line] [--interval <time>] [--network <name>] - Show price chart (defaults to /USDC)',
-      'Intervals: 5m, 15m, 1h, 4h, 1d, 1w (default: 1h for candles)',
-      'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
-      'swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>] - Interactive swap', 
-      'swap limit <amount> <from> <to> [--rate <rate>] [--network <name>] - Create limit order'
-    ].forEach(cmd => addLine(cmd)),
+    help: () => {
+      const basicCommands = [
+        'help - Show commands',
+        'clear - Clear terminal',
+        'date - Show date',
+        'whoami - Show user',
+        'history - Command history',
+        'history clear - Clear command history',
+        'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
+        'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace',
+        'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
+        'networkinfo [chain] - Get network information and statistics',
+        'wallet - Show wallet info',
+        'balance - Show native token balance',
+        'nft_balance [address] - Show NFT holdings across all chains (defaults to connected wallet)',
+        'message <text> - Sign message (requires wallet)',
+        'price <symbol|address> [--network <name>] - Get token price',
+        'chart <token0> [token1] [--type candle|line] [--interval <time>] [--network <name>] - Show price chart (defaults to /USDC)',
+        'Intervals: 5m, 15m, 1h, 4h, 1d, 1w (default: 1h for candles)',
+        'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
+        '',
+        '=== DEX TRADING ===',
+        'swap classic <amount> <from> <to> [--protocol <dex>] [--network <name>] [--slippage <percent>]',
+        'swap limit <amount> <from> <to> [--rate <rate>] [--protocol <dex>] [--network <name>]',
+        'compare <amount> <from> <to> [--network <name>] - Compare rates across protocols',
+        '',
+        '=== PROTOCOL COMMANDS ===',
+        '1inch-stats [--network <chain>] - Show 1inch protocol statistics',
+        '1inch-routes <amount> <from> <to> [--network <chain>] - Analyze 1inch routing',
+        '',
+        `Available protocols: ${pluginRegistry.getAvailableProtocols().join(', ')}`
+      ];
+
+      basicCommands.forEach(cmd => addLine(cmd));
+    },
 
     clear: () => setLines([]),
 
@@ -181,46 +195,90 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
+    // Plugin-aware swap command
     swap: async (args: string[]) => {
+      addLine('🚨 DEBUG: New plugin swap command called!');
+      addLine(`🚨 DEBUG: Args received: [${args.join(', ')}]`);
+
       if (!isConnected) {
         addLine('❌ Access denied: Wallet connection required', 'error');
         addLine('Connect your wallet to use swap commands', 'error');
         return;
       }
 
-      if (args[0] === 'classic') {
-        const parsed = parseSwapCommand(args);
-        if (!parsed) {
-          addLine('Usage: swap classic <amount> <from> <to> [--network <name>] [--slippage <percent>]', 'error');
-          addLine('Example: swap classic 0.001 eth usdc --network optimism --slippage 0.5', 'error');
-          return;
-        }
+      // Parse for --protocol flag, default to 1inch
+      let protocol = '1inch';
+      let cleanArgs = [...args]; // Create a copy to avoid modifying original
+      const protocolIndex = cleanArgs.findIndex(arg => arg === '--protocol');
+      if (protocolIndex !== -1 && protocolIndex + 1 < cleanArgs.length) {
+        protocol = cleanArgs[protocolIndex + 1].toLowerCase();
+        // Remove --protocol and its value from args copy
+        cleanArgs.splice(protocolIndex, 2);
+      }
 
-        const { amount, fromToken, toToken, network, slippage } = parsed;
-        updateTabName?.('swap', 'classic');
-        await handleClassicSwap(amount, fromToken, toToken, network, slippage);
-        
-      } else if (args[0] === 'limit') {
-        const parsed = parseLimitOrderCommand(args);
-        if (!parsed) {
-          addLine('Usage: swap limit <amount> <from> <to> [--rate <rate>] [--network <name>]', 'error');
-          addLine('Example: swap limit 1 eth usdc --rate 4000 --network optimism', 'error');
-          return;
-        }
-
-        const { amount, fromToken, toToken, network, rate } = parsed;
-        updateTabName?.('swap', 'limit');
-        await handleLimitOrder(amount, fromToken, toToken, network, rate);
-        
-      } else {
-        addLine('Usage: swap <classic|limit> <amount> <from> <to> [options]', 'error');
-        addLine('  swap classic - Immediate swap with slippage protection', 'error');
-        addLine('  swap limit - Create limit order at specific rate', 'error');
+      // Get the plugin
+      const plugin = pluginRegistry.getPlugin(protocol);
+      if (!plugin) {
+        addLine(`❌ Protocol "${protocol}" not found`, 'error');
+        const available = pluginRegistry.getAvailableProtocols();
+        addLine(`Available protocols: ${available.join(', ')}`);
         return;
+      }
+
+      // Let the plugin handle the command
+      try {
+        await plugin.executeCommand('swap', cleanArgs, ctx);
+      } catch (error: any) {
+        addLine(`❌ ${protocol} swap failed: ${error.message}`, 'error');
+      }
+    },
+
+    // Protocol statistics
+    '1inch-stats': async (args: string[]) => {
+      const plugin = pluginRegistry.getPlugin('1inch');
+      if (plugin) {
+        await plugin.executeCommand('1inch-stats', args, ctx);
+      } else {
+        addLine('❌ 1inch plugin not available', 'error');
+      }
+    },
+
+    // 1inch routing analysis
+    '1inch-routes': async (args: string[]) => {
+      const plugin = pluginRegistry.getPlugin('1inch');
+      if (plugin) {
+        await plugin.executeCommand('1inch-routes', args, ctx);
+      } else {
+        addLine('❌ 1inch plugin not available', 'error');
+      }
+    },
+
+    // Compare rates across protocols
+    compare: async (args: string[]) => {
+      if (args.length < 3) {
+        addLine('Usage: compare <amount> <from> <to> [--network <chain>]', 'error');
+        addLine('Example: compare 1 eth usdc --network optimism', 'error');
+        return;
+      }
+
+      const [amount, fromToken, toToken] = args;
+      const { network } = parseNetwork(args, chainId.toString());
+
+      addLine(`🔍 Comparing rates across protocols for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
+      addLine(`🌐 Network: Chain ${network}`);
+      addLine('');
+
+      const plugins = pluginRegistry.getAllPlugins();
+      for (const plugin of plugins) {
+        if (plugin.supportedChains.includes(parseInt(network))) {
+          addLine(`📊 ${plugin.name.toUpperCase()}: Rate comparison would be implemented here`);
+        }
       }
     },
 
     price: async (args: string[]) => {
+      addLine(`🚨 PRICE COMMAND CALLED with args: [${args.join(', ')}]`);
+
       if (!args[0]) {
         addLine('Usage: price <symbol|address> [--network <name>]', 'error');
         addLine('Example: price eth --network arbitrum', 'error');
@@ -972,6 +1030,6 @@ export const createCommands = (ctx: CommandContext) => {
 
 // Command registry with all available commands
 export const COMMAND_LIST = [
-  'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'nft_balance', 'message', 
-  'price', 'chart', 'swap', 'rpc', 'trace', 'gas', 'networkinfo'
+  'help', 'clear', 'date', 'whoami', 'history', 'wallet', 'balance', 'nft_balance', 'message',
+  'price', 'chart', 'swap', 'compare', '1inch-stats', '1inch-routes', 'rpc', 'trace', 'gas', 'networkinfo'
 ];

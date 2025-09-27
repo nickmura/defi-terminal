@@ -819,7 +819,9 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
 
   const processCommand = async (command: string) => {
     const [cmd, ...args] = command.split(' ');
-    
+
+    addLine(`🚨 PROCESS COMMAND: "${cmd}" with args: [${args.join(', ')}]`);
+
     // Create command context
     const commandContext = {
       addLine,

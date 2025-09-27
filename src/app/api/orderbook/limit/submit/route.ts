@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
     console.log(limitOrderWithFee, limitOrderWithFee instanceof LimitOrderWithFee);
 
     const submitOrder = await sdk.submitOrder(limitOrderWithFee, signature);
-    console.log(submitOrder);
 
 
     return NextResponse.json({
