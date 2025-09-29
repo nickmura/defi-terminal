@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TOKENS } from '../../../helper';
+import { TOKENS } from '../../../../helper';
 
 const BASE_URL = 'https://api.1inch.dev/price/v1.1';
 

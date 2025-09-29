@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Sdk, MakerTraits, FetchProviderConnector, Address, Extension, randBigInt } from "@1inch/limit-order-sdk";
 import { keccak256 } from 'viem';
 
-import { getProperTokenAddress } from "../../../helper";
+import { getProperTokenAddress } from "../../../../helper";
 
 export async function POST(request: NextRequest) {
   try {
