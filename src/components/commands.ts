@@ -70,25 +70,24 @@ export const createCommands = (ctx: CommandContext) => {
     commandHistory, 
     setCommandHistory,
     signMessageAsync,
-    handleClassicSwap,
-    handleLimitOrder,
-    parseSwapCommand,
-    parseLimitOrderCommand,
     openChartModal,
     updateTabName,
     domain,
     hasDomain
   } = ctx;
 
+  // Get all plugin commands and merge with core commands
+  const pluginCommands = pluginRegistry.getAllCommands(ctx);
+
   return {
+    // Core general commands
     help: () => {
       const basicCommands = [
         'help - Show commands',
         'clear - Clear terminal',
         'date - Show date',
         'whoami - Show user',
-        'history - Command history',
-        
+        'history [page] - Command history (paginated, 20 per page)',
         'history clear - Clear command history',
         '',
         '1INCH CALLS',
@@ -137,13 +136,58 @@ export const createCommands = (ctx: CommandContext) => {
       if (args[0] === 'clear') {
         setCommandHistory([]);
         addLine('Command history cleared');
-      } else {
-        if (commandHistory.length === 0) {
-          addLine('No command history available');
-        } else {
-          addLine(`Command history (${commandHistory.length} entries):`);
-          commandHistory.forEach((cmd, i) => addLine(`${i + 1}  ${cmd}`));
+        return;
+      }
+
+      if (commandHistory.length === 0) {
+        addLine('No command history available');
+        return;
+      }
+
+      // Sliding window configuration
+      const windowSize = 20; // Show 20 commands per page
+      let page = 0;
+
+      // Parse page number from args
+      if (args[0] && !isNaN(parseInt(args[0]))) {
+        page = Math.max(0, parseInt(args[0]) - 1); // Convert to 0-based index
+      }
+
+      // Calculate window bounds
+      const totalCommands = commandHistory.length;
+      const totalPages = Math.ceil(totalCommands / windowSize);
+      const startIndex = page * windowSize;
+      const endIndex = Math.min(startIndex + windowSize, totalCommands);
+
+      // Validate page bounds
+      if (startIndex >= totalCommands) {
+        addLine(`Page ${page + 1} not found. History has ${totalPages} pages.`, 'error');
+        return;
+      }
+
+      // Get the sliding window of commands
+      const windowCommands = commandHistory.slice(startIndex, endIndex);
+
+      // Display header with pagination info
+      addLine(`Command history (${totalCommands} entries, page ${page + 1}/${totalPages}):`);
+
+      // Display commands with their absolute position numbers
+      windowCommands.forEach((cmd, i) => {
+        const absoluteIndex = startIndex + i + 1;
+        addLine(`  ${absoluteIndex.toString().padStart(3, ' ')}  ${cmd}`);
+      });
+
+      // Display navigation help
+      if (totalPages > 1) {
+        addLine('');
+        if (page > 0 && page < totalPages - 1) {
+          addLine(`Use: history ${page} (prev) | history ${page + 2} (next)`);
+        } else if (page === 0 && totalPages > 1) {
+          addLine(`Use: history ${page + 2} (next page)`);
+        } else if (page === totalPages - 1 && page > 0) {
+          addLine(`Use: history ${page} (prev page)`);
         }
+        addLine(`Pages 1-${totalPages} available | history clear (to clear)`);
       }
     },
 
@@ -262,94 +306,6 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
-    price: async (args: string[]) => {
-      addLine(`🚨 PRICE COMMAND CALLED with args: [${args.join(', ')}]`);
-
-      if (!args[0]) {
-        addLine('Usage: price <symbol|address> [--network <name>]', 'error');
-        addLine('Example: price eth --network arbitrum', 'error');
-        return;
-      }
-
-      const token = args[0];
-      const { network } = parseNetwork(args, chainId.toString());
-
-      try {
-        let tokenAddress = token;
-        
-        // If it looks like a symbol (not an address), try to resolve it
-        if (!token.startsWith('0x') && token.length < 10) {
-          addLine(`🔍 Resolving ${token.toUpperCase()} address...`);
-          const resolved = await resolveTokenAddress(token, parseInt(network));
-          if (resolved) {
-            tokenAddress = resolved;
-            addLine(`✅ Resolved to: ${resolved}`);
-          } else {
-            addLine(`⚠️  Token not found, trying symbol directly...`);
-            tokenAddress = token; // Fallback to using symbol
-          }
-        }
-
-        addLine(`🔍 Getting price for ${token.toUpperCase()}...`);
-        
-        // Update tab name temporarily for price operation
-        updateTabName?.('price', token.toLowerCase());
-        
-        const response = await fetch(`/api/1inch/prices/price_by_token?chainId=${network}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: tokenAddress })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          addLine(`❌ Failed to get price: ${errorData.error}`, 'error');
-          return;
-        }
-
-        const data = await response.json();
-        const getNetworkName = (chainId: string) => {
-          const names: { [key: string]: string } = {
-            '1': 'Ethereum',
-            '137': 'Polygon',
-            '10': 'Optimism',
-            '42161': 'Arbitrum',
-            '8453': 'Base',
-            '56': 'BSC',
-            '43114': 'Avalanche'
-          };
-          return names[chainId] || `Chain ${chainId}`;
-        };
-        const networkName = getNetworkName(network);
-        
-        const price = parseFloat(data.price);
-        
-        // Format price to show significant digits instead of fixed decimal places
-        let formattedPrice;
-        if (price >= 1) {
-          formattedPrice = price.toFixed(4);
-        } else if (price >= 0.01) {
-          formattedPrice = price.toFixed(6);
-        } else if (price >= 0.0001) {
-          formattedPrice = price.toFixed(8);
-        } else {
-          // For very small prices, use toPrecision to show significant digits
-          formattedPrice = price.toPrecision(6);
-        }
-        
-        addLine(`💰 ${token.toUpperCase()} Price:`);
-        addLine(`   Price: $${formattedPrice} USD`);
-        addLine(`   Network: ${networkName}`);
-        addLine(`   Address: ${data.token}`);
-        
-        // Reset tab name after price operation
-        updateTabName?.('defi');
-      } catch (error) {
-        addLine(`❌ Error getting price: ${error}`, 'error');
-        // Reset tab name on error too
-        updateTabName?.('defi');
-      }
-    },
 
     chart: async (args: string[]) => {
       if (args.length < 1) {
@@ -458,115 +414,6 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
-    rpc: async (args: string[]) => {
-      if (args.length === 0) {
-        addLine('Usage: rpc <method> [params...] [--network <chain>]', 'error');
-        addLine('');
-        addLine('Examples:');
-        addLine('  rpc eth_blockNumber');
-        addLine('  rpc eth_getBalance 0x742d35Cc6634C0532925a3b844Bc9e7595f62a40 latest');
-        addLine('  rpc eth_getCode 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 latest');
-        addLine('  rpc eth_call {"to":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","data":"0x18160ddd"} latest');
-        addLine('  rpc eth_getBalance 0x742d35Cc6634C0532925a3b844Bc9e7595f62a40 0x1234567 --network ethereum');
-        return;
-      }
-
-      const method = args[0];
-      let params: any[] = [];
-      const { network, networkIndex } = parseNetwork(args, chainId.toString());
-      
-      // Remove network args from params
-      if (networkIndex !== -1) {
-        // If it's --network with value, remove both flag and value
-        if (args[networkIndex] === '--network') {
-          args = [...args.slice(1, networkIndex), ...args.slice(networkIndex + 2)];
-        } else {
-          // It's a shortcut like --optimism, just remove that one
-          args = [...args.slice(1, networkIndex), ...args.slice(networkIndex + 1)];
-        }
-      } else {
-        args = args.slice(1);
-      }
-
-      // Parse parameters
-      for (const arg of args) {
-        // Try to parse as JSON first (for objects)
-        if (arg.startsWith('{') || arg.startsWith('[')) {
-          try {
-            params.push(JSON.parse(arg));
-          } catch {
-            params.push(arg);
-          }
-        } else {
-          params.push(arg);
-        }
-      }
-
-      addLine(`🔄 Executing RPC: ${method} on chain ${network}`);
-      
-      try {
-        const response = await fetch(`/api/1inch/eth_rpc?chainId=${network}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: method,
-            params: params,
-            id: Date.now()
-          })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          addLine(`❌ RPC Error: ${error.error?.message || 'Unknown error'}`, 'error');
-          return;
-        }
-
-        const data = await response.json();
-        
-        if (data.error) {
-          addLine(`❌ RPC Error: ${data.error.message}`, 'error');
-          if (data.error.data) {
-            addLine(`Details: ${data.error.data}`, 'error');
-          }
-          return;
-        }
-
-        // Format the result based on the method
-        addLine('✅ RPC Result:');
-        
-        if (method === 'eth_blockNumber') {
-          addLine(`  Block Number: ${data.result}`);
-          if (data.resultHex) {
-            addLine(`  Hex: ${data.resultHex}`);
-          }
-        } else if (method === 'eth_getBalance') {
-          if (typeof data.result === 'object') {
-            addLine(`  Balance: ${data.result.ether} ETH`);
-            addLine(`  Wei: ${data.result.wei}`);
-            addLine(`  Hex: ${data.result.hex}`);
-          } else {
-            addLine(`  Result: ${data.result}`);
-          }
-        } else if (method === 'eth_getCode') {
-          const code = data.result;
-          if (code === '0x') {
-            addLine('  No contract code (EOA address)');
-          } else {
-            addLine(`  Contract bytecode: ${code.slice(0, 66)}...`);
-            addLine(`  Size: ${(code.length - 2) / 2} bytes`);
-          }
-        } else {
-          // Generic result display
-          addLine(`  Result: ${JSON.stringify(data.result, null, 2)}`);
-        }
-
-      } catch (error) {
-        addLine(`❌ Failed to execute RPC: ${error}`, 'error');
-      }
-    },
 
     trace: async (args: string[]) => {
       if (args.length < 1) {
@@ -1010,7 +857,10 @@ export const createCommands = (ctx: CommandContext) => {
       } catch (error) {
         addLine(`❌ Failed to fetch NFT data: ${error}`, 'error');
       }
-    }
+    },
+
+    // Merge all plugin commands
+    ...pluginCommands
   };
 };
 

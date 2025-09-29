@@ -66,6 +66,23 @@ export class PluginRegistry {
 
     return undefined;
   }
+
+  // Get all commands from all plugins merged together
+  getAllCommands(context: any): { [key: string]: any } {
+    const allCommands: { [key: string]: any } = {};
+
+    for (const plugin of this.plugins.values()) {
+      const commands = plugin.getCommands();
+      for (const command of commands) {
+        // Create a wrapper that calls the plugin's executeCommand with captured context
+        allCommands[command.name] = async (args: string[]) => {
+          await plugin.executeCommand(command.name, args, context);
+        };
+      }
+    }
+
+    return allCommands;
+  }
 }
 
 // Export singleton instance

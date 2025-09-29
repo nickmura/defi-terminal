@@ -1,6 +1,7 @@
 import { PluginCommand, CommandHandler } from './types';
 import { OneInchAPI } from './api';
 import { config } from '@/hooks/config';
+import { resolveTokenAddress } from '../../app/helper';
 
 // Parse command arguments and extract network/protocol info
 const parseArgs = (args: string[], defaultNetwork: string) => {
@@ -178,49 +179,420 @@ const swapCommand: CommandHandler = async (args: string[], context: any) => {
   }
 };
 
-// 1inch Stats Command
-const statsCommand: CommandHandler = async (args: string[], context: any) => {
-  const { addLine, chainId } = context;
-  const { network } = parseArgs(args, chainId.toString());
+// Price command
+const priceCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId, updateTabName } = context;
 
-  addLine('📊 1inch Protocol Statistics');
-  addLine(`🌐 Network: Chain ${network}`);
-  addLine('');
-  addLine('✅ Features supported:');
-  addLine('   • Classic swaps with gas optimization');
-  addLine('   • Limit orders with 5-minute expiration');
-  addLine('   • Multiple protocol aggregation');
-  addLine('   • Partial fills on limit orders');
-  addLine('');
-  addLine('🔗 API Version: v6.0');
-  addLine('📈 Protocol: Aggregated DEX routing');
-};
-
-// Compare rates across 1inch routes
-const routesCommand: CommandHandler = async (args: string[], context: any) => {
-  const { addLine, chainId } = context;
-
-  if (args.length < 3) {
-    addLine('Usage: 1inch-routes <amount> <from> <to> [--network <chain>]', 'error');
-    addLine('Example: 1inch-routes 1 eth usdc --network optimism', 'error');
+  if (!args[0]) {
+    addLine('Usage: price <symbol|address> [--network <name>]', 'error');
+    addLine('Example: price eth --network arbitrum', 'error');
     return;
   }
 
-  const [amount, fromToken, toToken] = args;
+  const token = args[0];
   const { network } = parseArgs(args, chainId.toString());
 
-  addLine(`🔍 Finding best 1inch routes for ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
-  addLine(`🌐 Network: Chain ${network}`);
-  addLine('');
+  try {
+    let tokenAddress = token;
+
+    // If it looks like a symbol (not an address), try to resolve it
+    if (!token.startsWith('0x') && token.length < 10) {
+      addLine(`🔍 Resolving ${token.toUpperCase()} address...`);
+      const resolved = await resolveTokenAddress(token, parseInt(network));
+      if (resolved) {
+        tokenAddress = resolved;
+        addLine(`✅ Resolved to: ${resolved}`);
+      } else {
+        addLine(`⚠️  Token not found, trying symbol directly...`);
+        tokenAddress = token; // Fallback to using symbol
+      }
+    }
+
+    addLine(`🔍 Getting price for ${token.toUpperCase()}...`);
+
+    // Update tab name temporarily for price operation
+    updateTabName?.('price', token.toLowerCase());
+
+    const response = await fetch(`/api/1inch/prices/price_by_token?chainId=${network}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: tokenAddress })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      addLine(`❌ Failed to get price: ${errorData.error}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+    const getNetworkName = (chainId: string) => {
+      const names: { [key: string]: string } = {
+        '1': 'Ethereum',
+        '137': 'Polygon',
+        '10': 'Optimism',
+        '42161': 'Arbitrum',
+        '8453': 'Base',
+        '56': 'BSC',
+        '43114': 'Avalanche'
+      };
+      return names[chainId] || `Chain ${chainId}`;
+    };
+    const networkName = getNetworkName(network);
+
+    const price = parseFloat(data.price);
+
+    // Format price to show significant digits instead of fixed decimal places
+    let formattedPrice;
+    if (price >= 1) {
+      formattedPrice = price.toFixed(4);
+    } else if (price >= 0.01) {
+      formattedPrice = price.toFixed(6);
+    } else if (price >= 0.0001) {
+      formattedPrice = price.toFixed(8);
+    } else {
+      // For very small prices, use toPrecision to show significant digits
+      formattedPrice = price.toPrecision(6);
+    }
+
+    addLine(`💰 ${token.toUpperCase()} Price:`);
+    addLine(`   Price: $${formattedPrice} USD`);
+    addLine(`   Network: ${networkName}`);
+    addLine(`   Address: ${data.token}`);
+
+    // Reset tab name after price operation
+    updateTabName?.('defi');
+  } catch (error) {
+    addLine(`❌ Error getting price: ${error}`, 'error');
+    // Reset tab name on error too
+    updateTabName?.('defi');
+  }
+};
+
+// Gas command
+const gasCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId } = context;
+  const { network } = parseArgs(args, chainId.toString());
+
+  addLine(`⛽ Getting gas prices for network ${network}...`);
 
   try {
-    // This would call the 1inch API to get route breakdown
-    addLine('⏳ Fetching route options...');
-    addLine('✅ This would show detailed routing through different DEXs');
-    addLine('📊 Route optimization analysis would appear here');
+    const response = await fetch(`/api/1inch/gas?chainId=${network}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      addLine(`❌ Failed to get gas prices: ${errorData.error}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+    const getNetworkName = (chainId: string) => {
+      const names: { [key: string]: string } = {
+        '1': 'Ethereum',
+        '137': 'Polygon',
+        '10': 'Optimism',
+        '42161': 'Arbitrum',
+        '8453': 'Base',
+        '56': 'BSC',
+        '43114': 'Avalanche'
+      };
+      return names[chainId] || `Chain ${chainId}`;
+    };
+    const networkName = getNetworkName(network);
+
+    const baseFee = data.baseFee || 0;
+    const priorityFeeLow = data.low?.maxPriorityFeePerGas || 0;
+    const priorityFeeMedium = data.medium?.maxPriorityFeePerGas || baseFee * 0.1;
+    const priorityFeeHigh = data.high?.maxPriorityFeePerGas || baseFee * 0.2;
+
+    addLine(`⛽ Gas Prices on ${networkName}:`);
+
+    if (data.low) {
+      const lowTotal = (baseFee + priorityFeeLow) / 1e9;
+      addLine(`   🟢 Low: ${lowTotal.toFixed(2)} Gwei`);
+    }
+
+    if (data.medium) {
+      const mediumTotal = (baseFee + priorityFeeMedium) / 1e9;
+      addLine(`   🟡 Medium: ${mediumTotal.toFixed(2)} Gwei`);
+    }
+
+    if (data.high) {
+      const highTotal = (baseFee + priorityFeeHigh) / 1e9;
+      addLine(`   🔴 High: ${highTotal.toFixed(2)} Gwei`);
+    }
+
+    if (baseFee) {
+      addLine(`   📊 Base Fee: ${(baseFee / 1e9).toFixed(2)} Gwei`);
+    }
+  } catch (error) {
+    addLine(`❌ Error fetching gas prices: ${error}`, 'error');
+  }
+};
+
+// Tokens command
+const tokensCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId } = context;
+  const { network } = parseArgs(args, chainId.toString());
+
+  addLine(`📋 Getting supported tokens for chain ${network}...`);
+
+  try {
+    const response = await fetch(`/api/1inch/tokens/details?chain=${network}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      addLine(`❌ Failed to get tokens: ${errorData.error}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+
+    addLine(`💎 Supported Tokens on Chain ${network}:`);
+    addLine('');
+
+    // Sort tokens by symbol for easier reading
+    const sortedTokens = Object.entries(data.tokens)
+      .sort(([, a]: any, [, b]: any) => a.symbol.localeCompare(b.symbol))
+      .slice(0, 20); // Show first 20 tokens
+
+    sortedTokens.forEach(([address, token]: any) => {
+      addLine(`  ${token.symbol.padEnd(8)} - ${token.name}`);
+      addLine(`    Address: ${address}`);
+    });
+
+    addLine(`\nShowing 20 of ${Object.keys(data.tokens).length} tokens`);
+  } catch (error) {
+    addLine(`❌ Error fetching tokens: ${error}`, 'error');
+  }
+};
+
+// Chart command
+const chartCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId, openChartModal } = context;
+
+  if (args.length < 1) {
+    addLine('Usage: chart <token0> [token1] [--type candle|line] [--network <name>]', 'error');
+    addLine('Example: chart eth usdc --network arbitrum', 'error');
+    return;
+  }
+
+  const { network, cleanArgs } = parseArgs(args, chainId.toString());
+  let chartType: 'candle' | 'line' = 'candle';
+
+  const typeIndex = cleanArgs.findIndex(arg => arg === '--type');
+  if (typeIndex !== -1 && typeIndex + 1 < cleanArgs.length) {
+    const type = cleanArgs[typeIndex + 1].toLowerCase();
+    if (type === 'line' || type === 'candle') {
+      chartType = type;
+    }
+  }
+
+  // Filter out type flags
+  const tokenArgs = cleanArgs.filter((arg, index) => {
+    if (index === typeIndex || index === typeIndex + 1) return false;
+    return true;
+  });
+
+  const token0 = tokenArgs[0] || '';
+  const token1 = tokenArgs[1] || 'usdc'; // Default to USDC
+
+  addLine(`📊 Opening ${chartType} chart for ${token0.toUpperCase()}/${token1.toUpperCase()}`);
+  openChartModal?.(token0, token1, network, chartType, '1h');
+};
+
+// Trace command
+const traceCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId } = context;
+
+  if (args.length < 1) {
+    addLine('Usage: trace <txHash> [blockNumber] [--network <chain>]', 'error');
+    return;
+  }
+
+  const txHash = args[0];
+  const blockNumber = args[1] || 'latest';
+  const { network } = parseArgs(args, chainId.toString());
+
+  addLine(`🔍 Getting transaction trace for ${txHash.slice(0, 10)}...`);
+  addLine(`📦 Block: ${blockNumber}`);
+  addLine(`🌐 Network: Chain ${network}`);
+
+  try {
+    const response = await fetch(`/api/1inch/traces?chain=${network}&blockNumber=${blockNumber}&txHash=${txHash}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      addLine(`❌ Failed to get trace: ${errorData.error}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.message) {
+      addLine(`⚠️  ${data.message}`, 'warn');
+    }
+
+    // Display transaction summary
+    if (data.summary) {
+      addLine('📊 Transaction Summary:');
+      addLine(`   Status: ${data.summary.status}`);
+      addLine(`   From: ${data.summary.from}`);
+      addLine(`   To: ${data.summary.to}`);
+      addLine(`   Gas Used: ${data.summary.gasUsed}`);
+    }
+  } catch (error) {
+    addLine(`❌ Error getting trace: ${error}`, 'error');
+  }
+};
+
+// NFT command
+const nftCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, address: userAddress, isConnected, chainId } = context;
+
+  let targetAddress = userAddress;
+  let chains = [chainId.toString()];
+
+  // Parse arguments
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('0x')) {
+      targetAddress = args[i];
+    } else if (args[i] === '--all-chains') {
+      chains = ['1', '137', '10', '42161', '8453', '56', '43114'];
+    }
+  }
+
+  if (!targetAddress || !isConnected) {
+    addLine('❌ Please connect your wallet or provide an address', 'error');
+    addLine('Usage: nft [address] [--all-chains]', 'error');
+    return;
+  }
+
+  addLine(`🖼️  Fetching NFTs for ${targetAddress.slice(0, 6)}...${targetAddress.slice(-4)}`);
+
+  try {
+    const chainParams = chains.map(c => `chainId=${c}`).join('&');
+    const response = await fetch(`/api/1inch/nft/byaddress?address=${targetAddress}&${chainParams}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      addLine(`❌ Failed to fetch NFTs: ${errorData.error}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.message) {
+      addLine(`⚠️  ${data.message}`, 'warn');
+      return;
+    }
+
+    addLine('📭 NFT fetching not yet fully implemented');
+  } catch (error) {
+    addLine(`❌ Error fetching NFTs: ${error}`, 'error');
+  }
+};
+
+// RPC command - direct Ethereum RPC calls through 1inch infrastructure
+const rpcCommand: CommandHandler = async (args: string[], context: any) => {
+  const { addLine, chainId } = context;
+
+  if (args.length === 0) {
+    addLine('Usage: rpc <method> [params...] [--network <chain>]', 'error');
+    addLine('');
+    addLine('Examples:');
+    addLine('  rpc eth_blockNumber');
+    addLine('  rpc eth_getBalance 0x742d35Cc6634C0532925a3b844Bc9e7595f62a40 latest');
+    addLine('  rpc eth_getCode 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 latest');
+    addLine('  rpc eth_call {"to":"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48","data":"0x18160ddd"} latest');
+    return;
+  }
+
+  const method = args[0];
+  let params: any[] = [];
+  const { network } = parseArgs(args, chainId.toString());
+
+  // Parse parameters (skip method name)
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    // Skip network flags
+    if (arg.startsWith('--')) {
+      if (arg === '--network') i++; // Skip next arg too
+      continue;
+    }
+
+    // Try to parse as JSON first (for objects)
+    if (arg.startsWith('{') || arg.startsWith('[')) {
+      try {
+        params.push(JSON.parse(arg));
+      } catch {
+        params.push(arg);
+      }
+    } else {
+      params.push(arg);
+    }
+  }
+
+  addLine(`🔄 Executing RPC: ${method} on chain ${network}`);
+
+  try {
+    const response = await fetch(`/api/1inch/eth_rpc?chainId=${network}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: method,
+        params: params,
+        id: Date.now()
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      addLine(`❌ RPC Error: ${error.error?.message || 'Unknown error'}`, 'error');
+      return;
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      addLine(`❌ RPC Error: ${data.error.message}`, 'error');
+      if (data.error.data) {
+        addLine(`Details: ${data.error.data}`, 'error');
+      }
+      return;
+    }
+
+    // Format the result based on the method
+    addLine('✅ RPC Result:');
+
+    if (method === 'eth_blockNumber') {
+      addLine(`  Block Number: ${data.result}`);
+    } else if (method === 'eth_getBalance') {
+      if (typeof data.result === 'object') {
+        addLine(`  Balance: ${data.result.ether} ETH`);
+        addLine(`  Wei: ${data.result.wei}`);
+        addLine(`  Hex: ${data.result.hex}`);
+      } else {
+        addLine(`  Result: ${data.result}`);
+      }
+    } else if (method === 'eth_getCode') {
+      const code = data.result;
+      if (code === '0x') {
+        addLine('  No contract code (EOA address)');
+      } else {
+        addLine(`  Contract bytecode: ${code.slice(0, 66)}...`);
+        addLine(`  Size: ${(code.length - 2) / 2} bytes`);
+      }
+    } else {
+      // Generic result display
+      addLine(`  Result: ${JSON.stringify(data.result, null, 2)}`);
+    }
 
   } catch (error) {
-    addLine(`❌ Failed to fetch routes: ${error}`, 'error');
+    addLine(`❌ Failed to execute RPC: ${error}`, 'error');
   }
 };
 
@@ -237,17 +609,52 @@ export const oneInchCommands: PluginCommand[] = [
     handler: swapCommand
   },
   {
-    name: '1inch-stats',
-    description: 'Show 1inch protocol statistics and features',
-    usage: '1inch-stats [--network <chain>]',
-    examples: ['1inch-stats --network optimism'],
-    handler: statsCommand
+    name: 'price',
+    description: 'Get token price from 1inch',
+    usage: 'price <symbol|address> [--network <name>]',
+    examples: ['price eth --network arbitrum'],
+    handler: priceCommand
   },
   {
-    name: '1inch-routes',
-    description: 'Analyze 1inch routing options for a trade',
-    usage: '1inch-routes <amount> <from> <to> [--network <chain>]',
-    examples: ['1inch-routes 1 eth usdc --network optimism'],
-    handler: routesCommand
+    name: 'gas',
+    description: 'Get current gas prices from 1inch',
+    usage: 'gas [--network <name>]',
+    examples: ['gas --network ethereum'],
+    handler: gasCommand
+  },
+  {
+    name: 'tokens',
+    description: 'List supported tokens on 1inch',
+    usage: 'tokens [--network <name>]',
+    examples: ['tokens --network optimism'],
+    handler: tokensCommand
+  },
+  {
+    name: 'chart',
+    description: 'Display price chart for token pair',
+    usage: 'chart <token0> [token1] [--type candle|line] [--network <name>]',
+    examples: ['chart eth usdc --network arbitrum'],
+    handler: chartCommand
+  },
+  {
+    name: 'trace',
+    description: 'Get transaction trace details',
+    usage: 'trace <txHash> [blockNumber] [--network <chain>]',
+    examples: ['trace 0x123...abc --network ethereum'],
+    handler: traceCommand
+  },
+  {
+    name: 'nft',
+    description: 'Get NFTs for an address',
+    usage: 'nft [address] [--all-chains]',
+    examples: ['nft 0x123...abc --all-chains'],
+    handler: nftCommand
+  },
+  {
+    name: 'rpc',
+    description: 'Execute Ethereum RPC calls through 1inch infrastructure',
+    usage: 'rpc <method> [params...] [--network <chain>]',
+    examples: ['rpc eth_blockNumber', 'rpc eth_getBalance 0x742d35... latest'],
+    handler: rpcCommand
   }
 ];
