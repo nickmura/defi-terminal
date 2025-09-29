@@ -1,5 +1,6 @@
 import { PluginCommand, CommandHandler } from './types';
 import { OneInchAPI } from './api';
+import { config } from '@/hooks/config';
 
 // Parse command arguments and extract network/protocol info
 const parseArgs = (args: string[], defaultNetwork: string) => {
@@ -98,17 +99,23 @@ const swapCommand: CommandHandler = async (args: string[], context: any) => {
   const { network, cleanArgs } = parseArgs(args, chainId.toString());
   const swapType = cleanArgs[0];
 
-  // Debug output
-  addLine(`🔍 Debug: Original args: [${args.join(', ')}]`);
-  addLine(`🔍 Debug: Clean args: [${cleanArgs.join(', ')}]`);
-  addLine(`🔍 Debug: Swap type: ${swapType}, Network: ${network}`);
+  // Debug output (only if debug mode is enabled)
+  if (config.debug_commands_mode) {
+    addLine(`🔍 Debug: Original args: [${args.join(', ')}]`);
+    addLine(`🔍 Debug: Clean args: [${cleanArgs.join(', ')}]`);
+    addLine(`🔍 Debug: Swap type: ${swapType}, Network: ${network}`);
+    addLine(`🔄 Debug: using 1INCH for ${swapType} swap on chain ${network}`);
 
-  addLine(`🔄 Using 1INCH for ${swapType} swap on chain ${network}`);
+    
+  }
+
 
   if (swapType === 'classic') {
     // parseSwapCommand expects [type, amount, from, to, ...] NOT ['swap', type, amount, from, to]
     // So we pass cleanArgs directly: ['classic', '0.001', 'eth', 'usdc']
-    addLine(`🔍 Debug: Args for parseSwapCommand: [${cleanArgs.join(', ')}]`);
+    if (config.debug_commands_mode) {
+      addLine(`🔍 Debug: Args for parseSwapCommand: [${cleanArgs.join(', ')}]`);
+    }
 
     const parsed = parseSwapCommand(cleanArgs);
     if (!parsed) {
@@ -119,7 +126,9 @@ const swapCommand: CommandHandler = async (args: string[], context: any) => {
     }
 
     const { amount, fromToken, toToken, slippage } = parsed;
-    addLine(`🔍 Debug: Parsed result - amount: ${amount}, fromToken: ${fromToken}, toToken: ${toToken}, slippage: ${slippage}`);
+    if (config.debug_commands_mode) {
+      addLine(`🔍 Debug: Parsed result - amount: ${amount}, fromToken: ${fromToken}, toToken: ${toToken}, slippage: ${slippage}`);
+    }
     addLine(`📊 Swapping ${amount} ${fromToken.toUpperCase()} → ${toToken.toUpperCase()}`);
     updateTabName?.('swap', '1inch-classic');
 

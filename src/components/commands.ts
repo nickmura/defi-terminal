@@ -1,5 +1,6 @@
 import { resolveTokenAddress } from '../app/helper';
 import { pluginRegistry } from '@/plugins/registry';
+import { config } from '@/hooks/config';
 
 // Helper function to parse network from args
 const parseNetwork = (args: string[], defaultNetwork: string): { network: string; networkIndex: number } => {
@@ -87,7 +88,11 @@ export const createCommands = (ctx: CommandContext) => {
         'date - Show date',
         'whoami - Show user',
         'history - Command history',
+        
         'history clear - Clear command history',
+        '',
+        '1INCH CALLS',
+        '',
         'rpc <method> [params...] [--network <chain>] - Execute Ethereum RPC calls',
         'trace <txHash> [blockNumber] [--network <chain>] - Get transaction execution trace',
         'gas [amount] [--network <chain>] - Get current gas prices with optional ETH cost calculation',
@@ -101,14 +106,11 @@ export const createCommands = (ctx: CommandContext) => {
         'Intervals: 5m, 15m, 1h, 4h, 1d, 1w (default: 1h for candles)',
         'Networks: ethereum, optimism, arbitrum, polygon, base, bsc, avalanche',
         '',
-        '=== DEX TRADING ===',
+        'TRADES',
         'swap classic <amount> <from> <to> [--protocol <dex>] [--network <name>] [--slippage <percent>]',
         'swap limit <amount> <from> <to> [--rate <rate>] [--protocol <dex>] [--network <name>]',
-        'compare <amount> <from> <to> [--network <name>] - Compare rates across protocols',
         '',
-        '=== PROTOCOL COMMANDS ===',
-        '1inch-stats [--network <chain>] - Show 1inch protocol statistics',
-        '1inch-routes <amount> <from> <to> [--network <chain>] - Analyze 1inch routing',
+
         '',
         `Available protocols: ${pluginRegistry.getAvailableProtocols().join(', ')}`
       ];
@@ -197,8 +199,11 @@ export const createCommands = (ctx: CommandContext) => {
 
     // Plugin-aware swap command
     swap: async (args: string[]) => {
-      addLine('🚨 DEBUG: New plugin swap command called!');
-      addLine(`🚨 DEBUG: Args received: [${args.join(', ')}]`);
+      if (config.debug_commands_mode) {
+        addLine('🚨 DEBUG: New plugin swap command called!');
+        addLine(`🚨 DEBUG: Args received: [${args.join(', ')}]`);
+        addLine(`🚨 DEBUG: : [${args.join(', ')}]`);
+      }
 
       if (!isConnected) {
         addLine('❌ Access denied: Wallet connection required', 'error');
@@ -233,25 +238,6 @@ export const createCommands = (ctx: CommandContext) => {
       }
     },
 
-    // Protocol statistics
-    '1inch-stats': async (args: string[]) => {
-      const plugin = pluginRegistry.getPlugin('1inch');
-      if (plugin) {
-        await plugin.executeCommand('1inch-stats', args, ctx);
-      } else {
-        addLine('❌ 1inch plugin not available', 'error');
-      }
-    },
-
-    // 1inch routing analysis
-    '1inch-routes': async (args: string[]) => {
-      const plugin = pluginRegistry.getPlugin('1inch');
-      if (plugin) {
-        await plugin.executeCommand('1inch-routes', args, ctx);
-      } else {
-        addLine('❌ 1inch plugin not available', 'error');
-      }
-    },
 
     // Compare rates across protocols
     compare: async (args: string[]) => {
