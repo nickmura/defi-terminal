@@ -22,7 +22,7 @@ export function useDomainName(address: string | undefined): DomainLookup {
       setIsLoading(true);
       
       try {
-        const response = await fetch(`/api/domains/reverse-lookup?address=${address}`);
+        const response = await fetch(`/api/1inch/domains/reverse-lookup?address=${address}`);
         
         if (response.ok) {
           const data = await response.json();

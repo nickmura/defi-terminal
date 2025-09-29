@@ -118,7 +118,7 @@ export const resolveTokenAddress = async (symbol: string, chainId: number): Prom
 
   // Fallback to 1inch API
   try {
-    const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${chainId}`);
+    const response = await fetch(`/api/1inch/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${chainId}`);
     if (response.ok) {
       const data = await response.json();
       return data.token.address;
@@ -141,7 +141,7 @@ export const resolveTokenAddress = async (symbol: string, chainId: number): Prom
 
     // Fallback to 1inch API
     try {
-      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
+      const response = await fetch(`/api/1inch/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
       if (response.ok) {
         const data = await response.json();
         return data.token.decimals;
@@ -165,7 +165,7 @@ export const resolveTokenInfo = async (symbol: string, chainId: number): Promise
 
   // Fallback to 1inch API
   try {
-    const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${chainId}`);
+    const response = await fetch(`/api/1inch/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${chainId}`);
     if (response.ok) {
       const data = await response.json();
       return { 

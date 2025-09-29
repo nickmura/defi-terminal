@@ -309,7 +309,7 @@ export const createCommands = (ctx: CommandContext) => {
         // Update tab name temporarily for price operation
         updateTabName?.('price', token.toLowerCase());
         
-        const response = await fetch(`/api/prices/price_by_token?chainId=${network}`, {
+        const response = await fetch(`/api/1inch/prices/price_by_token?chainId=${network}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token: tokenAddress })
@@ -519,7 +519,7 @@ export const createCommands = (ctx: CommandContext) => {
       addLine(`🔄 Executing RPC: ${method} on chain ${network}`);
       
       try {
-        const response = await fetch(`/api/eth_rpc?chainId=${network}`, {
+        const response = await fetch(`/api/1inch/eth_rpc?chainId=${network}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -607,7 +607,7 @@ export const createCommands = (ctx: CommandContext) => {
       if (!blockNumber) {
         addLine(`🔍 Fetching transaction details...`);
         try {
-          const rpcResponse = await fetch(`/api/eth_rpc?chainId=${network}`, {
+          const rpcResponse = await fetch(`/api/1inch/eth_rpc?chainId=${network}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -654,7 +654,7 @@ export const createCommands = (ctx: CommandContext) => {
       addLine(`📦 Block: ${blockNumber} on chain ${network}`);
       
       try {
-        const response = await fetch(`/api/traces?chain=${network}&blockNumber=${blockNumber}&txHash=${txHash}`);
+        const response = await fetch(`/api/1inch/traces?chain=${network}&blockNumber=${blockNumber}&txHash=${txHash}`);
 
         if (!response.ok) {
           const error = await response.json();
@@ -751,7 +751,7 @@ export const createCommands = (ctx: CommandContext) => {
       }
       
       try {
-        const response = await fetch(`/api/gas?chainId=${network}`);
+        const response = await fetch(`/api/1inch/gas?chainId=${network}`);
 
         if (!response.ok) {
           const error = await response.json();
@@ -852,7 +852,7 @@ export const createCommands = (ctx: CommandContext) => {
       addLine(`🌐 Getting network information for chain ${network}...`);
       
       try {
-        const response = await fetch(`/api/tokens/details?chain=${network}`);
+        const response = await fetch(`/api/1inch/tokens/details?chain=${network}`);
 
         if (!response.ok) {
           const error = await response.json();
@@ -956,7 +956,7 @@ export const createCommands = (ctx: CommandContext) => {
       
       try {
         const chainParams = supportedChains.map(id => `chainId=${id}`).join('&');
-        const response = await fetch(`/api/nft/byaddress?address=${targetAddress}&${chainParams}`);
+        const response = await fetch(`/api/1inch/nft/byaddress?address=${targetAddress}&${chainParams}`);
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);

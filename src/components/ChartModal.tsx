@@ -149,7 +149,7 @@ export default function ChartWindow({
     setError(null);
     
     try {
-      const endpoint = chartType === 'candle' ? '/api/charts/candle' : '/api/charts/line';
+      const endpoint = chartType === 'candle' ? '/api/1inch/charts/candle' : '/api/1inch/charts/line';
       const params = new URLSearchParams({
         token0,
         token1,

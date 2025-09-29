@@ -170,7 +170,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
 
     // Fallback to 1inch API
     try {
-      const response = await fetch(`/api/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
+      const response = await fetch(`/api/1inch/tokens/resolve?symbol=${encodeURIComponent(symbol)}&chainId=${networkId}`);
       if (response.ok) {
         const data = await response.json();
         return data.token.address;
@@ -350,12 +350,12 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
 
       // Get prices for both tokens using the new price API
-      const fromPriceResponse = await fetch('/api/prices/price_by_token?chainId=' + network, {
+      const fromPriceResponse = await fetch('/api/1inch/prices/price_by_token?chainId=' + network, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: fromToken })
       });
-      const toPriceResponse = await fetch('/api/prices/price_by_token?chainId=' + network, {
+      const toPriceResponse = await fetch('/api/1inch/prices/price_by_token?chainId=' + network, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: toToken })
@@ -443,7 +443,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         addLine('🔍 Checking token approval...');
         
         // Get the 1inch router address that needs approval
-        const spenderResponse = await fetch(`/api/swap/classic/approve/spender?chainId=${swapQuote.network}`);
+        const spenderResponse = await fetch(`/api/1inch/swap/classic/approve/spender?chainId=${swapQuote.network}`);
         if (!spenderResponse.ok) {
           addLine('❌ Failed to get spender address', 'error');
           return;
@@ -453,7 +453,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
 
         // Check current allowance
         try {
-          const allowanceResponse = await fetch(`/api/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${swapQuote.network}`);
+          const allowanceResponse = await fetch(`/api/1inch/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${swapQuote.network}`);
           let allowance = BigInt(0);
           
           if (allowanceResponse.ok) {
@@ -493,7 +493,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
 
       // Step 2: Get swap transaction data
       addLine('📋 Preparing swap transaction...');
-      const executeUrl = `/api/swap/classic/execute?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei.toString()}&from=${address}&chainId=${swapQuote.network}&slippage=${swapQuote.slippage}`;
+      const executeUrl = `/api/1inch/swap/classic/execute?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei.toString()}&from=${address}&chainId=${swapQuote.network}&slippage=${swapQuote.slippage}`;
       
       const response = await fetch(executeUrl);
       const data = await response.json();
@@ -578,7 +578,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       addLine(`   Rate: ${limitOrder.rate} ${limitOrder.toToken.toUpperCase()} per ${limitOrder.fromToken.toUpperCase()}`);
       addLine(`   Network: ${limitOrder.network === '10' ? 'Optimism' : 'Arbitrum'}`);
 
-      const response = await fetch('/api/orderbook/limit/create', {
+      const response = await fetch('/api/1inch/orderbook/limit/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createData)
@@ -599,7 +599,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       if (await srcAddress !== '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
         addLine('🔍 Checking token allowance...');
         
-        const allowanceResponse = await fetch(`/api/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${limitOrder.network}`);
+        const allowanceResponse = await fetch(`/api/1inch/swap/classic/approve/allowance?tokenAddress=${srcAddress}&walletAddress=${address}&chainId=${limitOrder.network}`);
         const allowanceData = await allowanceResponse.json();
         
         const decimals = getTokenDecimals(limitOrder.fromToken, parseInt(limitOrder.network));
@@ -608,7 +608,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         if (parseFloat(allowanceData.allowance) < requiredAmount) {
           addLine('📝 Token approval required...');
           
-          const spenderResponse = await fetch(`/api/swap/classic/approve/spender?chainId=${limitOrder.network}`);
+          const spenderResponse = await fetch(`/api/1inch/swap/classic/approve/spender?chainId=${limitOrder.network}`);
           const spenderData = await spenderResponse.json();
           
           try {
@@ -649,7 +649,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
         addLine('🚀 Submitting limit order...');
         
         // Submit the order
-        const submitResponse = await fetch('/api/orderbook/limit/submit', {
+        const submitResponse = await fetch('/api/1inch/orderbook/limit/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -708,7 +708,7 @@ export default function Terminal({ tabId, onTabNameChange }: TerminalProps = {})
       const decimals = await getTokenDecimals(fromToken, parseInt(network));
       const amountWei = (parseFloat(amount) * Math.pow(10, decimals)).toString();
 
-      const quoteUrl = `/api/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
+      const quoteUrl = `/api/1inch/swap/classic/quote?src=${srcAddress}&dst=${dstAddress}&amount=${amountWei}&chainId=${network}&slippage=${slippage}`;
       
       const response = await fetch(quoteUrl);
       const data = await response.json();
